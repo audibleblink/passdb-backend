@@ -1,0 +1,13 @@
+blink@gmail.com:p@ssword1!
+blink@yahoo.com:p@ssword1!
+blink@yahoo.com:p@ssword2!
+blink@gmail.com:p@ssword1!
+blink@yahoo.com:p@ssword1!
+blink@yahoo.com:p@ssword3!
+admin@gmail.com:p@ssword1!
+admin@yahoo.com:p@ssword4!
+admin@yahoo.com:p@ssword2!
+admin@msn.com:p@ssword2!
+admin@yahoo.com:p@ssword2!
+admin@mail.ru:p@ssword2!
+admin@yahoo.com:p@ssword2!

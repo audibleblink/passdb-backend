@@ -1,0 +1,11 @@
+production:
+  host: 'localhost'
+  adapter: 'postgresql'
+  encoding: utf-8
+  database: 'passdb'
+  username: 'passdb_user'
+  password: 'passdb_pass'
+
+development:
+  adapter: 'sqlite3'
+  database: 'db/passdb.sqlite3'
