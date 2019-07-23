@@ -1,14 +1,14 @@
 class AddRecords < ActiveRecord::Migration
   def self.up
     create_table :records do |t|
-      t.references :password
-      t.references :domain
-      t.references :username
+      t.references :password, null: false
+      t.references :domain, null: false
+      t.references :username, null: false
 
-      t.timestamps
+      t.timestamps null: false
     end
 
-    
+    add_index :records, [:password_id, :domain_id, :username_id], unique: true
   end
 
   def self.down

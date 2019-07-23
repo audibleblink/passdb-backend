@@ -40,7 +40,7 @@ tar_extract.each do |file|
       record.password = Password.find_or_create_by!(password: password)
       record.domain = Domain.find_or_create_by!(domain: domain)
       record.save!
-    rescue ActiveRecord::RecordInvalid => err
+    rescue ActiveRecord::RecordNotUnique => err
       puts "Skipping record for #{username} because:", err
       next
     end

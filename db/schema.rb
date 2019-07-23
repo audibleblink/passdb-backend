@@ -14,35 +14,37 @@
 ActiveRecord::Schema.define(version: 20190722084308) do
 
   create_table "domains", force: :cascade do |t|
-    t.string   "domain"
-    t.datetime "created_at"
-    t.datetime "updated_at"
+    t.string   "domain",     null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
   end
 
-  add_index "domains", ["domain"], name: "index_domains_on_domain"
+  add_index "domains", ["domain"], name: "index_domains_on_domain", unique: true
 
   create_table "passwords", force: :cascade do |t|
-    t.string   "password"
-    t.datetime "created_at"
-    t.datetime "updated_at"
+    t.string   "password",   null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
   end
 
-  add_index "passwords", ["password"], name: "index_passwords_on_password"
+  add_index "passwords", ["password"], name: "index_passwords_on_password", unique: true
 
   create_table "records", force: :cascade do |t|
-    t.integer  "password_id"
-    t.integer  "domain_id"
-    t.integer  "username_id"
-    t.datetime "created_at"
-    t.datetime "updated_at"
+    t.integer  "password_id", null: false
+    t.integer  "domain_id",   null: false
+    t.integer  "username_id", null: false
+    t.datetime "created_at",  null: false
+    t.datetime "updated_at",  null: false
   end
+
+  add_index "records", ["password_id", "domain_id", "username_id"], name: "index_records_on_password_id_and_domain_id_and_username_id", unique: true
 
   create_table "usernames", force: :cascade do |t|
-    t.string   "name"
-    t.datetime "created_at"
-    t.datetime "updated_at"
+    t.string   "name",       null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
   end
 
-  add_index "usernames", ["name"], name: "index_usernames_on_name"
+  add_index "usernames", ["name"], name: "index_usernames_on_name", unique: true
 
 end
