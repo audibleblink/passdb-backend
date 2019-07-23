@@ -25,17 +25,39 @@ bundle exec ruby db/seeds.rb <dump.tar.gz>
 
 ### Querying
 
+Associations are set in the ORM such that pivotting on any of `username`, `password`, or `domain`
+is possible
+
 ```
-bundle exec rake
+# start with a domain
+yahoo = Domain.find_by(domain: "yahoo.com")
+
+# find all passwords by yahoo mail users
+yahoo.passwords
+
+# find all yahoo mail users
+yahoo.usernames
+
+# find all password of a particular yahoo mail user
+yahoo.usernames.first.passwords
 
 
-[1] pry(main)> Password.first
-D, [2019-07-22T19:11:56.615253 #10090] DEBUG -- :   Password Load (0.1ms)  SELECT  "passwords".* FROM "passwords"  ORDER BY "passwords"."id" ASC LIMIT 1
-=> #<Password:0x00005590259a2580
- id: 1,
- password: "p@ssword1!",
- created_at: 2019-07-22 23:11:47 UTC,
- updated_at: 2019-07-22 23:11:47 UTC>
-[2] pry(main)>
+
+# start with a user
+eric = Usernames.find_by(name: "eric1990")
+
+# see all passwords belonging to eric
+eric.passwords
+
+# see all email account for eric
+eric.domains
+
+
+
+# starting with a password
+pass = Password.find_by(password: "P@ssw0rd!")
+
+# see the users that share this password
+pass.usernames
 ```
 
