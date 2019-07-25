@@ -1,0 +1,6 @@
+github.com/gregdel/pushover v0.0.0-20190217183207-15d3fef40636 h1:6agUllU8gUNAallyB+afeLXMRLL6Q1z+S6YC7Pi1EIY=
+github.com/gregdel/pushover v0.0.0-20190217183207-15d3fef40636/go.mod h1:NbuXd8Iwy5dU99qFToB8mSE29qJOQNW/bphiV8CWj/k=
+github.com/korovkin/limiter v0.0.0-20170610225302-6b837f5fd496 h1:bS17I5YOpfCP6KS7aFOm0/LkZn6J2M/g41+O6LzvtUY=
+github.com/korovkin/limiter v0.0.0-20170610225302-6b837f5fd496/go.mod h1:bttpekv26JrhFNCYlxnxn8a1jw8Q0gi8iHe0RC4JLBg=
+github.com/lib/pq v1.2.0 h1:LXpIM/LZ5xGFhOpXAQUIMM1HdyqzVYM13zNdjCEEcA0=
+github.com/lib/pq v1.2.0/go.mod h1:5WUZQaWbwv1U+lTReE5YruASi9Al49XbQIvNi/34Woo=
