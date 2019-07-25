@@ -15,7 +15,8 @@ Theres a test tar int `tests` dir
 ```
 bundle install
 bundle exec rake db:reset
-bundle exec ruby db/seeds.rb <dump.tar.gz>
+
+seeder/seeder ?.tar.gz
 # contents of tar
 # some-folder
 # |-- dumpfile1.txt
