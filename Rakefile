@@ -3,13 +3,13 @@ require "active_record"
 
 task :default => ["query"] 
 task :query do
-  require_relative 'query'
+  require_relative 'db/query'
 end
 
 namespace :db do
 
   task :env do
-    require_relative 'database'
+    require_relative 'db/database'
   end
 
   task :admin => :env do
