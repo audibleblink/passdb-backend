@@ -59,6 +59,47 @@ namespace :db do
     ActiveRecord::Base.establish_connection(DB_CONF)
     Rake::Task["db:migrate"].invoke
   end
+
+  desc "Get table sizes for the database"
+  task :stat => :env do
+    if ENV['RACK_ENV'] == DEV
+      puts 'PRODUCTION only'
+    else
+      table = ActiveRecord::Base.connection.exec_query <<-EOF
+      SELECT nspname || '.' || relname AS "relation",
+          pg_size_pretty(pg_total_relation_size(C.oid)) AS "total_size"
+      FROM pg_class C
+      LEFT JOIN pg_namespace N ON (N.oid = C.relnamespace)
+      WHERE nspname NOT IN ('pg_catalog', 'information_schema')
+        AND C.relkind <> 'i'
+        AND nspname !~ '^pg_toast'
+      ORDER BY pg_total_relation_size(C.oid) DESC
+      LIMIT 20;
+      EOF
+      table.each do |row|
+        puts row['total_size'] + "\t\t" + row['relation']
+      end
+    end
+
+  end
+
+  desc "Get connection states"
+  task :conn => :env do
+    if ENV['RACK_ENV'] == DEV
+      puts 'PRODUCTION only'
+    else
+      table = ActiveRecord::Base.connection.exec_query <<-EOF
+      SELECT max_conn,used,res_for_super,max_conn-used-res_for_super res_for_normal
+      FROM
+        (SELECT count(*) used FROM pg_stat_activity) t1,
+        (SELECT setting::int res_for_super FROM pg_settings WHERE name=$$superuser_reserved_connections$$) t2,
+        (SELECT setting::int max_conn FROM pg_settings WHERE name=$$max_connections$$) t3
+      EOF
+      table.each do |row|
+        puts row
+      end
+    end
+  end
 end
 
 namespace :g do
@@ -72,10 +113,10 @@ namespace :g do
     File.open(path, 'w') do |file|
       file.write <<-EOF
 class #{migration_class} < ActiveRecord::Migration
-  def self.up
-  end
-  def self.down
-  end
+def self.up
+end
+def self.down
+end
 end
       EOF
     end
