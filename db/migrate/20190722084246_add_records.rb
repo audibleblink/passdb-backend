@@ -1,6 +1,6 @@
 class AddRecords < ActiveRecord::Migration
   def self.up
-    create_table :records do |t|
+    create_table :records, :unlogged do |t|
       t.references :password, null: false
       t.references :domain, null: false
       t.references :username, null: false

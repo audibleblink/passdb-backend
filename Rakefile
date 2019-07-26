@@ -39,6 +39,20 @@ namespace :db do
     end
 
     puts "Database migrated."
+    Rake::Task["db:vacuum"].invoke
+  end
+
+  desc "Disable vacuum"
+  task :vacuum => :env do
+    if ENV['RACK_ENV'] == DEV
+      puts 'PROD only'
+    else
+      %w(records passwords domains usernames).each do |table|
+        q = "ALTER TABLE #{table} SET (autovacuum_enabled = false)"
+        ActiveRecord::Base.connection.exec_query(q)
+      end
+    end
+    puts "Setting applied."
   end
 
   desc "Drop the database"
