@@ -32,7 +32,7 @@ func main() {
 	db.SetMaxIdleConns(200)
 	db.SetConnMaxLifetime(time.Hour)
 
-	// tarGzPath := "test.tar.gz"
+	// tarGzPath := "../tests/test_data.tar.gz"
 	tarGzPath := os.Args[1]
 
 	tarGz, err := os.Open(tarGzPath)
@@ -143,47 +143,22 @@ func count(db *sql.DB, table string) int {
 	return count
 }
 
-func findOrCreate(db *sql.DB, table, column, attr string) (int, bool) {
-	var id int
-
-	q := fmt.Sprintf(`SELECT id from %s WHERE %s = '%s'`, table, column, attr)
-	statement, err := db.Prepare(q)
-	if err != nil {
-		return id, false
-	}
-	defer statement.Close()
-
-	rows, err := statement.Query()
-	if err != nil {
-		return id, false
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		err := rows.Scan(&id)
-		if err != nil {
-			return id, false
-		}
-		return id, true
-	}
-
-	newID, err := create(db, table, column, attr)
-	if err != nil {
-		return newID, false
-	}
-	return newID, true
-}
-
-func create(db *sql.DB, table, col, attr string) (int, error) {
+func findOrCreate(db *sql.DB, table, col, attr string) (int, bool) {
 	var id int
 	q := fmt.Sprintf(
-		`INSERT INTO %s(%s) VALUES ('%s') RETURNING id`,
+		`INSERT INTO %s(%s) VALUES ('%s') ON CONFLICT (%s) DO UPDATE SET %s = EXCLUDED.%s RETURNING id`,
 		table,
 		col,
 		attr,
+		col,
+		col,
+		col,
 	)
 	err := db.QueryRow(q).Scan(&id)
-	return id, err
+	if err != nil {
+		return 0, false
+	}
+	return id, true
 }
 
 func createJoin(db *sql.DB, userID, passID, domainID int) (int, error) {

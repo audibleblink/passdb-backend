@@ -51,8 +51,8 @@ namespace :db do
         q = "ALTER TABLE #{table} SET (autovacuum_enabled = false)"
         ActiveRecord::Base.connection.exec_query(q)
       end
+      puts "Setting applied."
     end
-    puts "Setting applied."
   end
 
   desc "Drop the database"
