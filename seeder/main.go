@@ -18,6 +18,8 @@ import (
 	"github.com/lib/pq"
 )
 
+const connLimit = 300
+
 func main() {
 	connStr := os.Getenv("PG_CONN")
 	db, err := sql.Open("postgres", connStr)
@@ -26,8 +28,8 @@ func main() {
 	}
 	defer db.Close()
 
-	db.SetMaxOpenConns(300)
-	db.SetMaxIdleConns(50)
+	db.SetMaxOpenConns(connLimit)
+	db.SetMaxIdleConns(200)
 	db.SetConnMaxLifetime(time.Hour)
 
 	// tarGzPath := "test.tar.gz"
@@ -60,13 +62,13 @@ func main() {
 
 		if header.Typeflag == tar.TypeReg {
 			var wg sync.WaitGroup
-			lineCh := make(chan string, 40)
+			lineCh := make(chan string, connLimit)
 
 			// process lines in the background as they come in to the lineCh channel
 			// processing has not yet begun, but this 'listener' needs to be set up
 			// first
 			fmt.Println("Starting " + header.Name)
-			limit := limiter.NewConcurrencyLimiter(200)
+			limit := limiter.NewConcurrencyLimiter(connLimit)
 			go func(
 				wgi *sync.WaitGroup,
 				dbi *sql.DB,
