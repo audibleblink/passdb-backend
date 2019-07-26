@@ -1,6 +1,6 @@
 class AddDomains < ActiveRecord::Migration
   def self.up
-    create_table :domains do |t|
+    create_table :domains, unlogged: true do |t|
       t.string :domain, null: false
       t.timestamps null: false
     end

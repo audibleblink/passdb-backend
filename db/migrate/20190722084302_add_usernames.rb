@@ -1,6 +1,6 @@
 class AddUsernames < ActiveRecord::Migration
   def self.up
-    create_table :usernames do |t|
+    create_table :usernames, unlogged: true do |t|
       t.string :name, null: false
       t.timestamps null: false
     end

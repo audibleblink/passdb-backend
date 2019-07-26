@@ -13,13 +13,16 @@
 
 ActiveRecord::Schema.define(version: 20190722084308) do
 
+  # These are extensions that must be enabled in order to support this database
+  enable_extension "plpgsql"
+
   create_table "domains", force: :cascade do |t|
     t.string   "domain",     null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
   end
 
-  add_index "domains", ["domain"], name: "index_domains_on_domain", unique: true
+  add_index "domains", ["domain"], name: "index_domains_on_domain", unique: true, using: :btree
 
   create_table "passwords", force: :cascade do |t|
     t.string   "password",   null: false
@@ -27,7 +30,7 @@ ActiveRecord::Schema.define(version: 20190722084308) do
     t.datetime "updated_at", null: false
   end
 
-  add_index "passwords", ["password"], name: "index_passwords_on_password", unique: true
+  add_index "passwords", ["password"], name: "index_passwords_on_password", unique: true, using: :btree
 
   create_table "records", force: :cascade do |t|
     t.integer  "password_id", null: false
@@ -37,7 +40,7 @@ ActiveRecord::Schema.define(version: 20190722084308) do
     t.datetime "updated_at",  null: false
   end
 
-  add_index "records", ["password_id", "domain_id", "username_id"], name: "index_records_on_password_id_and_domain_id_and_username_id", unique: true
+  add_index "records", ["password_id", "domain_id", "username_id"], name: "index_records_on_password_id_and_domain_id_and_username_id", unique: true, using: :btree
 
   create_table "usernames", force: :cascade do |t|
     t.string   "name",       null: false
@@ -45,6 +48,6 @@ ActiveRecord::Schema.define(version: 20190722084308) do
     t.datetime "updated_at", null: false
   end
 
-  add_index "usernames", ["name"], name: "index_usernames_on_name", unique: true
+  add_index "usernames", ["name"], name: "index_usernames_on_name", unique: true, using: :btree
 
 end

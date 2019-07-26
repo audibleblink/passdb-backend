@@ -1,6 +1,6 @@
 class AddPasswords < ActiveRecord::Migration
   def self.up
-    create_table :passwords, :unlogged do |t|
+    create_table :passwords, unlogged: true do |t|
       t.string :password, null: false
       t.timestamps null: false
     end
