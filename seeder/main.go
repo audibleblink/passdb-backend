@@ -227,7 +227,7 @@ func parse(line string) (user, domain, password string) {
 }
 
 func alert(text string) {
-	app := pushover.New(os.Getenv("PO_API")
+	app := pushover.New(os.Getenv("PO_API"))
 	me := pushover.NewRecipient(os.Getenv("PO_USR"))
 	msg := pushover.NewMessage(text)
 	app.SendMessage(msg, me)
