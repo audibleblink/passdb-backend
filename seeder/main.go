@@ -18,7 +18,7 @@ import (
 	"github.com/lib/pq"
 )
 
-const connLimit = 300
+const connLimit = 450
 
 func main() {
 	connStr := os.Getenv("PG_CONN")

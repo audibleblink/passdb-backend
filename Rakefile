@@ -110,7 +110,9 @@ namespace :db do
         (SELECT setting::int max_conn FROM pg_settings WHERE name=$$max_connections$$) t3
       EOF
       table.each do |row|
-        puts row
+        row.each_pair do |k, v|
+          puts "#{v}\t#{k}"
+        end
       end
     end
   end
