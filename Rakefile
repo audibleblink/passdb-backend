@@ -141,3 +141,26 @@ end
     abort # needed stop other tasks
   end
 end
+
+namespace :bench do
+  desc "Benchmark Insertion Rate"
+  task :insert do
+    require 'active_record'
+    require_relative 'db/database'
+    require_relative 'models'
+
+    puts "Benchmarking seeder progress.  Starting Record Count: #{Record.count}"
+    while true do
+      orig_count = Record.count
+      sleep 10
+      new_count = Record.count
+      if new_count == orig_count
+        puts "Finished.  Total Records: #{new_count}"
+        break
+      else
+        puts "Total Records: #{new_count} - Insert Rate: #{(new_count - orig_count)*6} per minute"
+      end
+    end
+  end
+end
+
