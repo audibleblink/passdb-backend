@@ -15,7 +15,7 @@ import (
 
 	"github.com/gregdel/pushover"
 	"github.com/korovkin/limiter"
-	"github.com/lib/pq"
+	_ "github.com/lib/pq"
 )
 
 const connLimit = 450
@@ -176,29 +176,23 @@ func findOrCreate(db *sql.DB, table, column, attr string) (int, bool) {
 
 func create(db *sql.DB, table, col, attr string) (int, error) {
 	var id int
-	nowTime := pq.FormatTimestamp(time.Now())
 	q := fmt.Sprintf(
-		`INSERT INTO %s(%s, created_at, updated_at) VALUES ('%s', '%s', '%s') RETURNING id`,
+		`INSERT INTO %s(%s) VALUES ('%s') RETURNING id`,
 		table,
 		col,
 		attr,
-		nowTime,
-		nowTime,
 	)
 	err := db.QueryRow(q).Scan(&id)
 	return id, err
 }
 
 func createJoin(db *sql.DB, userID, passID, domainID int) (int, error) {
-	nowTime := pq.FormatTimestamp(time.Now())
 	q := fmt.Sprintf(
-		`INSERT INTO records(username_id, password_id, domain_id, created_at, updated_at) 
-		VALUES ('%d', '%d', '%d', '%s', '%s') RETURNING id`,
+		`INSERT INTO records(username_id, password_id, domain_id) 
+		VALUES ('%d', '%d', '%d') RETURNING id`,
 		userID,
 		passID,
 		domainID,
-		nowTime,
-		nowTime,
 	)
 
 	var id int
