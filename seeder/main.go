@@ -26,6 +26,10 @@ func main() {
 	}
 	defer db.Close()
 
+	db.SetMaxOpenConns(300)
+	db.SetMaxIdleConns(50)
+	db.SetConnMaxLifetime(time.Hour)
+
 	// tarGzPath := "test.tar.gz"
 	tarGzPath := os.Args[1]
 
@@ -56,13 +60,13 @@ func main() {
 
 		if header.Typeflag == tar.TypeReg {
 			var wg sync.WaitGroup
-			lineCh := make(chan string, 800)
+			lineCh := make(chan string, 40)
 
 			// process lines in the background as they come in to the lineCh channel
 			// processing has not yet begun, but this 'listener' needs to be set up
 			// first
 			fmt.Println("Starting " + header.Name)
-			limit := limiter.NewConcurrencyLimiter(400)
+			limit := limiter.NewConcurrencyLimiter(200)
 			go func(
 				wgi *sync.WaitGroup,
 				dbi *sql.DB,
@@ -70,10 +74,13 @@ func main() {
 				lim *limiter.ConcurrencyLimiter,
 			) {
 
-				for line := range lineCh {
-					lim.Execute(func() {
-						processAndSave(wgi, dbi, line)
-					})
+				for {
+					select {
+					case line := <-ch:
+						lim.Execute(func() {
+							processAndSave(wgi, dbi, line)
+						})
+					}
 				}
 
 			}(&wg, db, lineCh, limit)
