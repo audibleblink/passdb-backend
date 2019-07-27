@@ -100,3 +100,16 @@ pass = Password.find_by(password: "P@ssw0rd!")
 # see the users that share this password
 pass.usernames
 ```
+
+## Stats
+
+Run `rake -T` to see all tasks. 
+
+At the time of writing you can pull table sizes, current connection pool utilization 
+
+Stats below taken at 8 million entries:
+![](https://i.imgur.com/4ej5HlH.png)
+
+
+Seeder benchmarks with `bundle exec rake bench:insert`
+![](https://i.imgur.com/HGqhUJf.png)
