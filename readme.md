@@ -1,27 +1,60 @@
 # passdb
 
-password dump database normalizer and seeder
+Password dump database normalizer and seeder
 
 super alpha
 
+## DB Setup
+
+Depending on the data drive, add one of the `conf` files from the `db` directory to 
+Postgres' `conf.d` dir.
+
+```
+cp db/16gb_4cpu_ssd.conf /etc/postgres/10/main/conf.d/dump.conf
+systemctl restart postgres@10-main.service
+```
+
+Currently averaging around 350K inserts/minute with these settings and table configuration in `db/migrate/`
 
 ## Usage
 
-
 ### Seeding
 
-Theres a test tar int `tests` dir
+There's a test tar in the `tests` dir
+
+Dump entries should be in the format:
 
 ```
+email@domain.com:password
+```
+
+The parse logic in `seeder` takes a best-effort approach to pulling `domain`, `username`, and
+`password` from each line. Some dumps use `;` and `seeder` looks for that too. Apart from that, if
+it can't find all three datapoints in the line, it isn't added to the database.
+
+```
+# for psql
+export RACK_ENV=production
+
+# for sqlite
+export RACK_ENV=development
+
 bundle install
 bundle exec rake db:reset
 
-seeder/seeder ?.tar.gz
-# contents of tar
-# some-folder
-# |-- dumpfile1.txt
-# |-- dumpfile2.txt
-# --- dumpfile3.txt
+#build golang seeder
+cd seeder && go build -o seeder main.go
+
+#create a progress log file
+touch done.log
+
+# pushover.net token for mobile progress alerts
+export PO_USR=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+export PO_API=yyyyyyyyyyyyyyyyyyyyyyyyyyyyyy
+export PG_CONN='postgres://passdb_user:passdb_pass@localhost/passdb'
+
+# seed the
+./seeder test_data.tar.gz
 ```
 
 ### Querying
@@ -30,11 +63,17 @@ Associations are set in the ORM such that pivotting on any of `username`, `passw
 is possible
 
 ```
+# to start the query interface
+bundle exec rake
+
+
 # start with a domain
 yahoo = Domain.find_by(domain: "yahoo.com")
 
 # find all passwords by yahoo mail users
 yahoo.passwords
+
+
 
 # find all yahoo mail users
 yahoo.usernames
@@ -61,4 +100,3 @@ pass = Password.find_by(password: "P@ssw0rd!")
 # see the users that share this password
 pass.usernames
 ```
-

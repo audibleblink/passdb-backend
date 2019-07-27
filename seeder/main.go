@@ -51,7 +51,7 @@ func main() {
 	defer db.Close()
 
 	db.SetMaxOpenConns(connLimit)
-	db.SetMaxIdleConns(600)
+	db.SetMaxIdleConns(700)
 	db.SetConnMaxLifetime(time.Hour)
 
 	// tarGzPath := "../tests/test_data.tar.gz"
