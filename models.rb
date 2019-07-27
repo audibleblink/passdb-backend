@@ -22,5 +22,12 @@ class Record < ActiveRecord::Base
   belongs_to :domain
   belongs_to :password
   belongs_to :username
+
+  default_scope { includes(:username, :password, :domain) }
+
+  def to_s
+    "#{username.name}@#{domain.domain}:#{password.password}"
+  end
+
 end
 

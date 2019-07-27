@@ -1,2 +1,6 @@
-seeder/seeder
+seeder/*
+!seeder/main.go
+!seeder/go.sum
+!seeder/go.mode
+
 .env
