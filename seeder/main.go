@@ -15,7 +15,7 @@ import (
 
 	"github.com/gregdel/pushover"
 	"github.com/korovkin/limiter"
-	_ "github.com/lib/pq"
+	"github.com/lib/pq"
 )
 
 const (
@@ -160,7 +160,13 @@ func processAndSave(wg *sync.WaitGroup, db *sql.DB, lineText string) {
 	err := upsert(db, user, domain, password)
 
 	if err != nil {
-		log.Printf("COMMIT %s - %s", lineText, err.Error())
+		pqErr := (err).(*pq.Error)
+		switch pqErr.Code.Name() {
+		case "unique_violation":
+			// do nothing, there are a lot of these
+		default:
+			log.Printf("COMMIT %s - %s", lineText, pqErr.Message)
+		}
 	}
 }
 
