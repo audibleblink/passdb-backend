@@ -18,7 +18,10 @@ import (
 	_ "github.com/lib/pq"
 )
 
-const connLimit = 450
+const (
+	connLimit = 800
+	routines  = 400
+)
 
 func main() {
 	connStr := os.Getenv("PG_CONN")
@@ -29,7 +32,7 @@ func main() {
 	defer db.Close()
 
 	db.SetMaxOpenConns(connLimit)
-	db.SetMaxIdleConns(200)
+	db.SetMaxIdleConns(600)
 	db.SetConnMaxLifetime(time.Hour)
 
 	// tarGzPath := "../tests/test_data.tar.gz"
@@ -62,13 +65,13 @@ func main() {
 
 		if header.Typeflag == tar.TypeReg {
 			var wg sync.WaitGroup
-			lineCh := make(chan string, connLimit)
+			lineCh := make(chan string, routines)
 
 			// process lines in the background as they come in to the lineCh channel
 			// processing has not yet begun, but this 'listener' needs to be set up
 			// first
 			fmt.Println("Starting " + header.Name)
-			limit := limiter.NewConcurrencyLimiter(connLimit)
+			limit := limiter.NewConcurrencyLimiter(routines)
 			go func(
 				wgi *sync.WaitGroup,
 				dbi *sql.DB,
@@ -118,14 +121,43 @@ func main() {
 
 func processAndSave(wg *sync.WaitGroup, db *sql.DB, lineText string) {
 	defer wg.Done()
-	user, domain, password := parse(lineText)
-	userID, userExists := findOrCreate(db, "usernames", "name", strings.ToLower(user))
-	domainID, domainExists := findOrCreate(db, "domains", "domain", strings.ToLower(domain))
-	passwordID, passwordExists := findOrCreate(db, "passwords", "password", password)
 
-	if userExists && domainExists && passwordExists {
-		createJoin(db, userID, passwordID, domainID)
+	user, domain, password := parse(lineText)
+	upsert(db, user, domain, password)
+}
+
+func upsert(db *sql.DB, user, domain, password string) {
+	query := fmt.Sprintf(`
+	WITH ins1 AS (
+		INSERT INTO usernames(name) VALUES ('%s')
+		ON CONFLICT (name) DO UPDATE SET name=EXCLUDED.name
+		RETURNING id AS user_id
+	)
+	, ins2 AS (
+		INSERT INTO passwords(password) VALUES ('%s')
+		ON CONFLICT (password) DO UPDATE SET password=EXCLUDED.password
+		RETURNING id AS pass_id
+	)
+	, ins3 AS (
+		INSERT INTO domains(domain) VALUES ('%s')
+		ON CONFLICT (domain) DO UPDATE SET domain=EXCLUDED.domain
+		RETURNING id AS domain_id
+	)
+
+	INSERT INTO records (username_id, password_id, domain_id)
+	VALUES (
+		(select user_id from ins1), 
+		(select pass_id from ins2), 
+		(select domain_id from ins3) 
+	)`, user, password, domain)
+
+	tx, _ := db.Begin()
+	_, err := tx.Exec(query)
+	if err != nil {
+		tx.Rollback()
+		return
 	}
+	tx.Commit()
 }
 
 func count(db *sql.DB, table string) int {
@@ -141,38 +173,6 @@ func count(db *sql.DB, table string) int {
 		rows.Scan(&count)
 	}
 	return count
-}
-
-func findOrCreate(db *sql.DB, table, col, attr string) (int, bool) {
-	var id int
-	q := fmt.Sprintf(
-		`INSERT INTO %s(%s) VALUES ('%s') ON CONFLICT (%s) DO UPDATE SET %s = EXCLUDED.%s RETURNING id`,
-		table,
-		col,
-		attr,
-		col,
-		col,
-		col,
-	)
-	err := db.QueryRow(q).Scan(&id)
-	if err != nil {
-		return 0, false
-	}
-	return id, true
-}
-
-func createJoin(db *sql.DB, userID, passID, domainID int) (int, error) {
-	q := fmt.Sprintf(
-		`INSERT INTO records(username_id, password_id, domain_id) 
-		VALUES ('%d', '%d', '%d') RETURNING id`,
-		userID,
-		passID,
-		domainID,
-	)
-
-	var id int
-	err := db.QueryRow(q).Scan(&id)
-	return id, err
 }
 
 func parse(line string) (user, domain, password string) {
