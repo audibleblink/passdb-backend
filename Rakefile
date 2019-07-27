@@ -149,16 +149,22 @@ namespace :bench do
     require_relative 'db/database'
     require_relative 'models'
 
-    puts "Benchmarking seeder progress.  Starting Record Count: #{Record.count}"
+    sleep_time = 15
+    skew = 0.98
+    mult = 60 / sleep_time
+
+    puts "Benchmarking seeder progress.  Starting Record Count: #{Record.last.id}"
     while true do
-      orig_count = Record.count
-      sleep 10
-      new_count = Record.count
+      # not the best way to count, but select COUNT(id) takes
+      # an increaseing amount of time as the # of records grow
+      orig_count = Record.last.id
+      sleep sleep_time
+      new_count = Record.last.id
       if new_count == orig_count
-        puts "Finished.  Total Records: #{new_count}"
-        break
+        puts "No new records: #{new_count}"
       else
-        puts "Total Records: #{new_count} - Insert Rate: #{(new_count - orig_count)*6} per minute"
+        delta = ((new_count - orig_count) * skew).floor
+        puts "Total: #{new_count} - Delta: #{delta} - Rate: #{delta * mult}/min #{delta/sleep_time}/sec"
       end
     end
   end
