@@ -164,8 +164,20 @@ func processAndSave(wg *sync.WaitGroup, db *sql.DB, lineText string) {
 		switch pqErr.Code.Name() {
 		case "unique_violation":
 			// do nothing, there are a lot of these
+			// especially when restarting import jobs
+		case "character_not_in_repertoire":
+			log.Printf(
+				"ENC line=%s|username=%s|domain=%s|password=%s|msg=%s",
+				lineText,
+				user,
+				domain,
+				password,
+				pqErr.Message,
+			)
+
+			// do nothing, there are a lot of these
 		default:
-			log.Printf("COMMIT %s - %s", lineText, pqErr.Message)
+			log.Printf("ERR %s - %s", lineText, pqErr.Message)
 		}
 	}
 }
