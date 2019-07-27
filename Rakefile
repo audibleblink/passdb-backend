@@ -76,6 +76,9 @@ namespace :db do
 
   desc "Get table sizes for the database"
   task :stat => :env do
+    ActiveSupport::Deprecation.behavior = :silence
+    $stderr.reopen(File.new('/dev/null', 'w'))
+
     if ENV['RACK_ENV'] == DEV
       puts 'PRODUCTION only'
     else
@@ -99,6 +102,8 @@ namespace :db do
 
   desc "Get connection states"
   task :conn => :env do
+    ActiveSupport::Deprecation.behavior = :silence
+    $stderr.reopen(File.new('/dev/null', 'w'))
     if ENV['RACK_ENV'] == DEV
       puts 'PRODUCTION only'
     else

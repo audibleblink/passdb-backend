@@ -25,6 +25,7 @@ const (
 
 var (
 	doneLog  = "done.log"
+	errLog   = "done.err"
 	finished map[string]bool
 )
 
@@ -44,10 +45,17 @@ func init() {
 }
 
 func main() {
+	f, err := os.OpenFile(errLog, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	if err != nil {
+		log.Fatalf("error opening file: %v", err)
+	}
+	defer f.Close()
+	log.SetOutput(f)
+
 	connStr := os.Getenv("PG_CONN")
 	db, err := sql.Open("postgres", connStr)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 	defer db.Close()
 
@@ -118,6 +126,7 @@ func main() {
 			// iterate through the lines in the file, adding each to the workgroup
 			// before dispatching the line to the processing listener
 			lineReader := bufio.NewScanner(tarReader)
+			counter = 0
 			for lineReader.Scan() {
 				lineCh <- lineReader.Text()
 				counter++
@@ -129,7 +138,6 @@ func main() {
 			recordCountAfter := count(db, "records")
 			newRecordsCount := recordCountAfter - recordCountBefore
 			duplicateCount := counter - newRecordsCount
-			counter = 0
 
 			msg := fmt.Sprintf(
 				"Finished processing: %s\nNew: %d\nSkipped: %d\nTotal: %d",
@@ -149,23 +157,27 @@ func processAndSave(wg *sync.WaitGroup, db *sql.DB, lineText string) {
 	defer wg.Done()
 
 	user, domain, password := parse(lineText)
-	upsert(db, user, domain, password)
+	err := upsert(db, user, domain, password)
+
+	if err != nil {
+		log.Printf("COMMIT %s - %s", lineText, err.Error())
+	}
 }
 
-func upsert(db *sql.DB, user, domain, password string) {
-	query := fmt.Sprintf(`
+func upsert(db *sql.DB, user, domain, password string) error {
+	query := `
 	WITH ins1 AS (
-		INSERT INTO usernames(name) VALUES ('%s')
+		INSERT INTO usernames(name) VALUES ($1)
 		ON CONFLICT (name) DO UPDATE SET name=EXCLUDED.name
 		RETURNING id AS user_id
 	)
 	, ins2 AS (
-		INSERT INTO passwords(password) VALUES ('%s')
+		INSERT INTO passwords(password) VALUES ($2)
 		ON CONFLICT (password) DO UPDATE SET password=EXCLUDED.password
 		RETURNING id AS pass_id
 	)
 	, ins3 AS (
-		INSERT INTO domains(domain) VALUES ('%s')
+		INSERT INTO domains(domain) VALUES ($3)
 		ON CONFLICT (domain) DO UPDATE SET domain=EXCLUDED.domain
 		RETURNING id AS domain_id
 	)
@@ -175,15 +187,28 @@ func upsert(db *sql.DB, user, domain, password string) {
 		(select user_id from ins1), 
 		(select pass_id from ins2), 
 		(select domain_id from ins3) 
-	)`, user, password, domain)
+	)`
 
-	tx, _ := db.Begin()
-	_, err := tx.Exec(query)
+	tx, err := db.Begin()
 	if err != nil {
 		tx.Rollback()
-		return
+		return err
 	}
-	tx.Commit()
+
+	preparedQuery, err := tx.Prepare(query)
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+	defer preparedQuery.Close()
+
+	_, err = preparedQuery.Exec(user, password, domain)
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	return tx.Commit()
 }
 
 // not the best way to count, but select COUNT(id) takes
@@ -242,11 +267,13 @@ func alert(text string) {
 func logger(file string) {
 	f, err := os.OpenFile(doneLog, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
-		log.Println(err)
+		fmt.Println(err)
+		os.Exit(1)
 	}
 	defer f.Close()
 	if _, err := f.WriteString(file + "\n"); err != nil {
-		log.Println(err)
+		fmt.Println(err)
+		os.Exit(1)
 	}
 }
 
