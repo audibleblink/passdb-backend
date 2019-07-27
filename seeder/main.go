@@ -23,6 +23,25 @@ const (
 	routines  = 400
 )
 
+var (
+	doneLog  = "done.log"
+	finished []string
+)
+
+func init() {
+	progressFile, err := os.Open(doneLog)
+	if err != nil {
+		panic(err)
+	}
+	defer progressFile.Close()
+
+	fileScanner := bufio.NewScanner(progressFile)
+	for fileScanner.Scan() {
+		f := fileScanner.Text()
+		finished = append(finished, f)
+	}
+}
+
 func main() {
 	connStr := os.Getenv("PG_CONN")
 	db, err := sql.Open("postgres", connStr)
@@ -66,6 +85,11 @@ func main() {
 		if header.Typeflag == tar.TypeReg {
 			var wg sync.WaitGroup
 			lineCh := make(chan string, routines)
+
+			if alreadyRun(header.Name) {
+				fmt.Printf("Skipping: %s\n", header.Name)
+				continue
+			}
 
 			// process lines in the background as they come in to the lineCh channel
 			// processing has not yet begun, but this 'listener' needs to be set up
@@ -114,9 +138,10 @@ func main() {
 				count(db, "records"),
 			)
 			alert(msg)
+			markDone(header.Name)
 		}
 	}
-	alert("Finished: " + tarGzPath)
+	alert("Completed tar: " + tarGzPath)
 }
 
 func processAndSave(wg *sync.WaitGroup, db *sql.DB, lineText string) {
@@ -209,4 +234,29 @@ func alert(text string) {
 	me := pushover.NewRecipient(os.Getenv("PO_USR"))
 	msg := pushover.NewMessage(text)
 	app.SendMessage(msg, me)
+}
+
+func logger(file string) {
+	f, err := os.OpenFile(doneLog, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		log.Println(err)
+	}
+	defer f.Close()
+	if _, err := f.WriteString(file + "\n"); err != nil {
+		log.Println(err)
+	}
+}
+
+func markDone(file string) {
+	finished = append(finished, file)
+	logger(file)
+}
+
+func alreadyRun(file string) bool {
+	for _, txt := range finished {
+		if txt == file {
+			return true
+		}
+	}
+	return false
 }
