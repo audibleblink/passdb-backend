@@ -19,17 +19,18 @@ import (
 )
 
 const (
-	connLimit = 800
-	routines  = 400
+	connLimit = 100
+	routines  = 50
 )
 
 var (
 	doneLog  = "done.log"
-	finished []string
+	finished map[string]bool
 )
 
 func init() {
 	progressFile, err := os.Open(doneLog)
+	finished = make(map[string]bool)
 	if err != nil {
 		panic(err)
 	}
@@ -38,7 +39,7 @@ func init() {
 	fileScanner := bufio.NewScanner(progressFile)
 	for fileScanner.Scan() {
 		f := fileScanner.Text()
-		finished = append(finished, f)
+		finished[f] = true
 	}
 }
 
@@ -73,7 +74,6 @@ func main() {
 	var counter int
 	alert("Starting: " + tarGzPath)
 	for {
-		recordCountBefore := count(db, "records")
 		header, err := tarReader.Next()
 		if err != nil {
 			if err == io.EOF {
@@ -83,18 +83,19 @@ func main() {
 		}
 
 		if header.Typeflag == tar.TypeReg {
-			var wg sync.WaitGroup
-			lineCh := make(chan string, routines)
-
 			if alreadyRun(header.Name) {
 				fmt.Printf("Skipping: %s\n", header.Name)
 				continue
 			}
 
+			var wg sync.WaitGroup
+			lineCh := make(chan string, routines)
+
 			// process lines in the background as they come in to the lineCh channel
 			// processing has not yet begun, but this 'listener' needs to be set up
 			// first
 			fmt.Println("Starting " + header.Name)
+			recordCountBefore := count(db, "records")
 			limit := limiter.NewConcurrencyLimiter(routines)
 			go func(
 				wgi *sync.WaitGroup,
@@ -135,7 +136,7 @@ func main() {
 				header.Name,
 				newRecordsCount,
 				duplicateCount,
-				count(db, "records"),
+				recordCountAfter,
 			)
 			alert(msg)
 			markDone(header.Name)
@@ -185,9 +186,11 @@ func upsert(db *sql.DB, user, domain, password string) {
 	tx.Commit()
 }
 
+// not the best way to count, but select COUNT(id) takes
+// an increaseing amount of time as the # of records grows
 func count(db *sql.DB, table string) int {
-	var count int
-	q := fmt.Sprintf(`SELECT COUNT(id) FROM %s`, table)
+	var id int
+	q := fmt.Sprintf(`SELECT MAX(id) FROM %s`, table)
 	rows, err := db.Query(q)
 	if err != nil {
 		panic(err)
@@ -195,9 +198,9 @@ func count(db *sql.DB, table string) int {
 	defer rows.Close()
 
 	for rows.Next() {
-		rows.Scan(&count)
+		rows.Scan(&id)
 	}
-	return count
+	return id
 }
 
 func parse(line string) (user, domain, password string) {
@@ -248,15 +251,10 @@ func logger(file string) {
 }
 
 func markDone(file string) {
-	finished = append(finished, file)
+	finished[file] = true
 	logger(file)
 }
 
 func alreadyRun(file string) bool {
-	for _, txt := range finished {
-		if txt == file {
-			return true
-		}
-	}
-	return false
+	return finished[file]
 }
