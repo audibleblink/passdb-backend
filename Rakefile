@@ -154,22 +154,27 @@ namespace :bench do
     require_relative 'db/database'
     require_relative 'models'
 
-    sleep_time = 15
-    skew = 0.98
-    mult = 60 / sleep_time
+    sleep_time = 10
+    per_min = 60 / sleep_time
+    txCQ = "SELECT xact_commit FROM pg_stat_database WHERE datname = 'passdb';"
+    txRQ = "SELECT xact_rollback FROM pg_stat_database WHERE datname = 'passdb';"
 
-    puts "Benchmarking seeder progress.  Starting Record Count: #{Record.last.id}"
+    orig_commit = ActiveRecord::Base.connection.exec_query(txCQ).rows[0][0].to_i
+    puts "Benchmarking seeder progress.  Starting Record Count: #{orig_commit}"
     while true do
-      # not the best way to count, but select COUNT(id) takes
-      # an increaseing amount of time as the # of records grow
-      orig_count = Record.last.id
+
+      orig_commit = ActiveRecord::Base.connection.exec_query(txCQ).rows[0][0].to_i
+      orig_rollbk = ActiveRecord::Base.connection.exec_query(txRQ).rows[0][0].to_i
       sleep sleep_time
-      new_count = Record.last.id
-      if new_count == orig_count
-        puts "No new records: #{new_count}"
+      new_commit = ActiveRecord::Base.connection.exec_query(txCQ).rows[0][0].to_i
+      new_rollbk = ActiveRecord::Base.connection.exec_query(txRQ).rows[0][0].to_i
+
+      if new_commit == orig_commit
+        puts "No new records #{new_commit}"
       else
-        delta = ((new_count - orig_count) * skew).floor
-        puts "Total: #{new_count} - Delta: #{delta} - Rate: #{delta * mult}/min #{delta/sleep_time}/sec"
+        comm_delta = new_commit - orig_commit
+        rlbk_delta = new_rollbk - orig_rollbk
+        puts "TXs: #{new_commit} - Rate: #{comm_delta * per_min}/min - #{comm_delta/sleep_time}/sec - Skipped: #{rlbk_delta}"
       end
     end
   end
