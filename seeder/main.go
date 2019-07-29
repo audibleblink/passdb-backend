@@ -19,13 +19,36 @@ import (
 )
 
 const (
-	connLimit = 100
-	routines  = 50
+	connLimit   = 100
+	routines    = 50
+	doneLog     = "done.log"
+	errLog      = "done.err"
+	upsertQuery = `
+	WITH ins1 AS (
+		INSERT INTO usernames(name) VALUES ($1)
+		ON CONFLICT (name) DO UPDATE SET name=EXCLUDED.name
+		RETURNING id AS user_id
+	)
+	, ins2 AS (
+		INSERT INTO passwords(password) VALUES ($2)
+		ON CONFLICT (password) DO UPDATE SET password=EXCLUDED.password
+		RETURNING id AS pass_id
+	)
+	, ins3 AS (
+		INSERT INTO domains(domain) VALUES ($3)
+		ON CONFLICT (domain) DO UPDATE SET domain=EXCLUDED.domain
+		RETURNING id AS domain_id
+	)
+
+	INSERT INTO records (username_id, password_id, domain_id)
+	VALUES (
+		(select user_id from ins1), 
+		(select pass_id from ins2), 
+		(select domain_id from ins3) 
+	)`
 )
 
 var (
-	doneLog  = "done.log"
-	errLog   = "done.err"
 	finished map[string]bool
 )
 
@@ -80,7 +103,7 @@ func main() {
 	tarReader := tar.NewReader(gzf)
 
 	var counter int
-	alert("Starting: " + tarGzPath)
+	go alert("Starting: " + tarGzPath)
 	for {
 		header, err := tarReader.Next()
 		if err != nil {
@@ -103,7 +126,6 @@ func main() {
 			// processing has not yet begun, but this 'listener' needs to be set up
 			// first
 			fmt.Println("Starting " + header.Name)
-			recordCountBefore := count(db, "records")
 			limit := limiter.NewConcurrencyLimiter(routines)
 			go func(
 				wgi *sync.WaitGroup,
@@ -111,16 +133,11 @@ func main() {
 				ch chan string,
 				lim *limiter.ConcurrencyLimiter,
 			) {
-
-				for {
-					select {
-					case line := <-ch:
-						lim.Execute(func() {
-							processAndSave(wgi, dbi, line)
-						})
-					}
+				for line := range ch {
+					lim.Execute(func() {
+						processAndSave(wgi, dbi, line)
+					})
 				}
-
 			}(&wg, db, lineCh, limit)
 
 			// iterate through the lines in the file, adding each to the workgroup
@@ -133,24 +150,47 @@ func main() {
 				wg.Add(1)
 			}
 
-			fmt.Println("Waiting for " + header.Name)
+			fmt.Println("Closing goroutines for " + header.Name)
 			wg.Wait()
-			recordCountAfter := count(db, "records")
-			newRecordsCount := recordCountAfter - recordCountBefore
-			duplicateCount := counter - newRecordsCount
-
-			msg := fmt.Sprintf(
-				"Finished processing: %s\nNew: %d\nSkipped: %d\nTotal: %d",
-				header.Name,
-				newRecordsCount,
-				duplicateCount,
-				recordCountAfter,
-			)
-			alert(msg)
+			go reportStats(db, header.Name, counter)
 			markDone(header.Name)
 		}
 	}
-	alert("Completed tar: " + tarGzPath)
+	go alert("Completed tar: " + tarGzPath)
+}
+
+func intQuery(db *sql.DB, query string) (int, error) {
+	var out int
+	rows, err := db.Query(query)
+	if err != nil {
+		return out, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		rows.Scan(&out)
+	}
+	return out, err
+}
+
+func count(db *sql.DB, table string) (int, error) {
+	q := fmt.Sprintf(`SELECT MAX(id) FROM %s`, table)
+	return intQuery(db, q)
+}
+
+func reportStats(db *sql.DB, filename string, counter int) {
+	recordCount, err := count(db, "records")
+	if err != nil {
+		log.Printf("ALRT Unable to send: %s\n", err.Error())
+	}
+
+	msg := fmt.Sprintf(
+		"Finished processing: %s\nProcessed: %d\nTotal: %d",
+		filename,
+		counter,
+		recordCount,
+	)
+	alert(msg)
 }
 
 func processAndSave(wg *sync.WaitGroup, db *sql.DB, lineText string) {
@@ -166,7 +206,7 @@ func processAndSave(wg *sync.WaitGroup, db *sql.DB, lineText string) {
 			// do nothing, there are a lot of these
 			// especially when restarting import jobs
 		case "character_not_in_repertoire":
-			log.Printf(
+			go log.Printf(
 				"ENC line=%s|username=%s|domain=%s|password=%s|msg=%s",
 				lineText,
 				user,
@@ -174,8 +214,6 @@ func processAndSave(wg *sync.WaitGroup, db *sql.DB, lineText string) {
 				password,
 				pqErr.Message,
 			)
-
-			// do nothing, there are a lot of these
 		default:
 			log.Printf("ERR %s - %s", lineText, pqErr.Message)
 		}
@@ -183,37 +221,13 @@ func processAndSave(wg *sync.WaitGroup, db *sql.DB, lineText string) {
 }
 
 func upsert(db *sql.DB, user, domain, password string) error {
-	query := `
-	WITH ins1 AS (
-		INSERT INTO usernames(name) VALUES ($1)
-		ON CONFLICT (name) DO UPDATE SET name=EXCLUDED.name
-		RETURNING id AS user_id
-	)
-	, ins2 AS (
-		INSERT INTO passwords(password) VALUES ($2)
-		ON CONFLICT (password) DO UPDATE SET password=EXCLUDED.password
-		RETURNING id AS pass_id
-	)
-	, ins3 AS (
-		INSERT INTO domains(domain) VALUES ($3)
-		ON CONFLICT (domain) DO UPDATE SET domain=EXCLUDED.domain
-		RETURNING id AS domain_id
-	)
-
-	INSERT INTO records (username_id, password_id, domain_id)
-	VALUES (
-		(select user_id from ins1), 
-		(select pass_id from ins2), 
-		(select domain_id from ins3) 
-	)`
-
 	tx, err := db.Begin()
 	if err != nil {
 		tx.Rollback()
 		return err
 	}
 
-	preparedQuery, err := tx.Prepare(query)
+	preparedQuery, err := tx.Prepare(upsertQuery)
 	if err != nil {
 		tx.Rollback()
 		return err
@@ -227,23 +241,6 @@ func upsert(db *sql.DB, user, domain, password string) error {
 	}
 
 	return tx.Commit()
-}
-
-// not the best way to count, but select COUNT(id) takes
-// an increaseing amount of time as the # of records grows
-func count(db *sql.DB, table string) int {
-	var id int
-	q := fmt.Sprintf(`SELECT MAX(id) FROM %s`, table)
-	rows, err := db.Query(q)
-	if err != nil {
-		panic(err)
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		rows.Scan(&id)
-	}
-	return id
 }
 
 func parse(line string) (user, domain, password string) {
