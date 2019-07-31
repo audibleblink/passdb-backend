@@ -32,26 +32,28 @@ namespace :db do
   task :migrate => :env do
     ActiveRecord::Migrator.migrate("db/migrate")
 
+    puts "Database migrated."
+    Rake::Task["db:optimize"].invoke
+
     require 'active_record/schema_dumper'
     filename = "db/schema.rb"
     File.open(filename, "w:utf-8") do |file|
       ActiveRecord::SchemaDumper.dump(ActiveRecord::Base.connection, file)
     end
-
-    puts "Database migrated."
-    Rake::Task["db:vacuum"].invoke
   end
 
-  desc "Disable vacuum"
-  task :vacuum => :env do
+  desc "Table optimaztions"
+  task :optimize => :env do
     if ENV['RACK_ENV'] == DEV
       puts 'PROD only'
     else
       %w(records passwords domains usernames).each do |table|
         q = "ALTER TABLE #{table} SET (autovacuum_enabled = false)"
         ActiveRecord::Base.connection.exec_query(q)
+        q = "ALTER TABLE #{table} SET UNLOGGED"
+        ActiveRecord::Base.connection.exec_query(q)
       end
-      puts "Setting applied."
+      puts "Settings applied."
     end
   end
 

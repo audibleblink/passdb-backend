@@ -1,4 +1,5 @@
 require 'active_record'
+require 'kaminari/activerecord'
 
 class Password < ActiveRecord::Base
   has_many :records
