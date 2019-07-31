@@ -3,29 +3,6 @@ require 'json'
 require_relative './db/database.rb'
 require_relative './models'
 
-def prepare(records)
-  records.map do |r|
-    {
-      username: r.username.name,
-      password: r.password. password,
-      domain: r.domain.domain
-    }
-  end
-    .sort_by { |h| h[:username] }
-    .to_json
-end
-
-def paginated(model, params)
-  records = if model && params[:page]
-              model.records.page(params[:page]).per(25).without_count
-            elsif model
-              model.records.page(1).per(25).without_count
-            else
-              []
-            end
-  p prepare(records)
-end
-
 before do 
   response.headers['Access-Control-Allow-Origin'] = '*'
 end
@@ -51,4 +28,32 @@ get '/emails/:email' do
     .where("usernames.name = ?", user)
     .where("domains.domain = ?", domain)
   prepare(emails)
+end
+
+
+helpers do
+
+  def prepare(records)
+    records.map do |r|
+      {
+        username: r.username.name,
+        password: r.password. password,
+        domain: r.domain.domain
+      }
+    end
+      .sort_by { |h| h[:username] }
+      .to_json
+  end
+
+  def paginated(model, params)
+    records = if model && params[:page]
+                model.records.page(params[:page]).per(25).without_count
+              elsif model
+                model.records.page(1).per(25).without_count
+              else
+                []
+              end
+    p prepare(records)
+  end
+
 end
