@@ -23,35 +23,37 @@ const (
 	routines    = 50
 	doneLog     = "done.log"
 	errLog      = "done.err"
+	testTar     = "../tests/test_data.tar.gz"
 	upsertQuery = `
-	WITH ins1 AS (
-		INSERT INTO usernames(name) VALUES ($1)
-		ON CONFLICT (name) DO UPDATE SET name=EXCLUDED.name
-		RETURNING id AS user_id
-	)
-	, ins2 AS (
-		INSERT INTO passwords(password) VALUES ($2)
-		ON CONFLICT (password) DO UPDATE SET password=EXCLUDED.password
-		RETURNING id AS pass_id
-	)
-	, ins3 AS (
-		INSERT INTO domains(domain) VALUES ($3)
-		ON CONFLICT (domain) DO UPDATE SET domain=EXCLUDED.domain
-		RETURNING id AS domain_id
-	)
+		WITH ins1 AS (
+			INSERT INTO usernames(name) VALUES ($1)
+			ON CONFLICT (name) DO UPDATE SET name=EXCLUDED.name
+			RETURNING id AS user_id
+		)
+		, ins2 AS (
+			INSERT INTO passwords(password) VALUES ($2)
+			ON CONFLICT (password) DO UPDATE SET password=EXCLUDED.password
+			RETURNING id AS pass_id
+		)
+		, ins3 AS (
+			INSERT INTO domains(domain) VALUES ($3)
+			ON CONFLICT (domain) DO UPDATE SET domain=EXCLUDED.domain
+			RETURNING id AS domain_id
+		)
 
-	INSERT INTO records (username_id, password_id, domain_id)
-	VALUES (
-		(select user_id from ins1), 
-		(select pass_id from ins2), 
-		(select domain_id from ins3) 
-	)`
+		INSERT INTO records (username_id, password_id, domain_id)
+		VALUES (
+			(select user_id from ins1), 
+			(select pass_id from ins2), 
+			(select domain_id from ins3) 
+		)`
 )
 
 var (
 	finished map[string]bool
 )
 
+// sets up the progress map so we can skip files that have already been processed
 func init() {
 	progressFile, err := os.Open(doneLog)
 	finished = make(map[string]bool)
@@ -86,8 +88,10 @@ func main() {
 	db.SetMaxIdleConns(connLimit)
 	db.SetConnMaxLifetime(connLimit * time.Second)
 
-	// tarGzPath := "../tests/test_data.tar.gz"
 	tarGzPath := os.Args[1]
+	if os.Getenv("TEST") != "" {
+		tarGzPath = testTar
+	}
 
 	tarGz, err := os.Open(tarGzPath)
 	if err != nil {
@@ -114,7 +118,7 @@ func main() {
 		}
 
 		if header.Typeflag == tar.TypeReg {
-			if alreadyRun(header.Name) {
+			if alreadyRan(header.Name) {
 				fmt.Printf("Skipping: %s\n", header.Name)
 				continue
 			}
@@ -159,6 +163,7 @@ func main() {
 	go alert("Completed tar: " + tarGzPath)
 }
 
+// helper for making queries that return a single int
 func intQuery(db *sql.DB, query string) (int, error) {
 	var out int
 	rows, err := db.Query(query)
@@ -173,11 +178,15 @@ func intQuery(db *sql.DB, query string) (int, error) {
 	return out, err
 }
 
+// not the best way to query count, but COUNT() takes incrementally
+// longer as the number of records grows
 func count(db *sql.DB, table string) (int, error) {
 	q := fmt.Sprintf(`SELECT MAX(id) FROM %s`, table)
 	return intQuery(db, q)
 }
 
+// send stats to a pushover acccount. called concurrently since our
+// data-processing doesn't rely an anything in here
 func reportStats(db *sql.DB, filename string, counter int) {
 	recordCount, err := count(db, "records")
 	if err != nil {
@@ -193,6 +202,8 @@ func reportStats(db *sql.DB, filename string, counter int) {
 	alert(msg)
 }
 
+// takes a raw line, converts it into data the DB would want and attempts
+// to persist the record
 func processAndSave(wg *sync.WaitGroup, db *sql.DB, lineText string) {
 	defer wg.Done()
 
@@ -220,6 +231,10 @@ func processAndSave(wg *sync.WaitGroup, db *sql.DB, lineText string) {
 	}
 }
 
+// attempt to commit data in a transaction. a new Record depends on
+// a user, password, and domain existing. record creation should be
+// idempotent given the ON CONFLICT clause in the query. #upsert
+// returns a pq.Error
 func upsert(db *sql.DB, user, domain, password string) error {
 	tx, err := db.Begin()
 	if err != nil {
@@ -243,6 +258,9 @@ func upsert(db *sql.DB, user, domain, password string) error {
 	return tx.Commit()
 }
 
+// contains the logic for breaking a line into desired username
+// password and email domain. currently accounts for the password
+// delimiter being both a : and a ;
 func parse(line string) (user, domain, password string) {
 	user, domain, password = "nil", "nil", "nil"
 
@@ -272,6 +290,7 @@ func parse(line string) (user, domain, password string) {
 	return
 }
 
+// send text to pushover account // moblie phone
 func alert(text string) {
 	app := pushover.New(os.Getenv("PO_API"))
 	me := pushover.NewRecipient(os.Getenv("PO_USR"))
@@ -279,6 +298,8 @@ func alert(text string) {
 	app.SendMessage(msg, me)
 }
 
+// commits text to a file. primarily used to append filenames that
+// have been processed already
 func logger(file string) {
 	f, err := os.OpenFile(doneLog, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
@@ -292,11 +313,14 @@ func logger(file string) {
 	}
 }
 
+// updated the in-memory progress map and commits the filename
+// to our progress log
 func markDone(file string) {
 	finished[file] = true
 	logger(file)
 }
 
-func alreadyRun(file string) bool {
+// duh
+func alreadyRan(file string) bool {
 	return finished[file]
 }
