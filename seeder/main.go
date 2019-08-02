@@ -58,7 +58,12 @@ func init() {
 	progressFile, err := os.Open(doneLog)
 	finished = make(map[string]bool)
 	if err != nil {
-		panic(err)
+		switch err {
+		case (err).(*os.PathError):
+			progressFile, err = os.Create(doneLog)
+		default:
+			panic(err)
+		}
 	}
 	defer progressFile.Close()
 
@@ -88,9 +93,11 @@ func main() {
 	db.SetMaxIdleConns(connLimit)
 	db.SetConnMaxLifetime(connLimit * time.Second)
 
-	tarGzPath := os.Args[1]
+	var tarGzPath string
 	if os.Getenv("TEST") != "" {
 		tarGzPath = testTar
+	} else {
+		tarGzPath = os.Args[1]
 	}
 
 	tarGz, err := os.Open(tarGzPath)

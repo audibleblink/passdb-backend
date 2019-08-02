@@ -3,7 +3,7 @@ production:
   adapter: 'postgresql'
   encoding: utf-8
   database: 'passdb'
-  username: 'passdb_user'
+  username: 'postgres'
   password: 'passdb_pass'
 
 development:

@@ -45,13 +45,13 @@ bundle exec rake db:reset
 #build golang seeder
 cd seeder && go build -o seeder main.go
 
-#create a progress log file
-touch done.log
-
 # pushover.net token for mobile progress alerts
 export PO_USR=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 export PO_API=yyyyyyyyyyyyyyyyyyyyyyyyyyyyyy
 export PG_CONN='postgres://passdb_user:passdb_pass@localhost/passdb'
+
+#macos postgres want this string instead
+export PG_CONN='postgres://passdb_user:passdb_pass@localhost/passdb?ssl_mode=disabled'
 
 # seed the
 ./seeder test_data.tar.gz
