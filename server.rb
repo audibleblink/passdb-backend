@@ -3,6 +3,7 @@ require 'json'
 require_relative './db/database.rb'
 require_relative './models'
 
+PER_PAGE = 50
 before do 
   response.headers['Access-Control-Allow-Origin'] = '*'
 end
@@ -34,26 +35,22 @@ end
 helpers do
 
   def prepare(records)
-    records.map do |r|
-      {
-        username: r.username.name,
-        password: r.password. password,
-        domain: r.domain.domain
-      }
-    end
+    records
+      .map(&:to_hash)
       .sort_by { |h| h[:username] }
       .to_json
   end
 
   def paginated(model, params)
     records = if model && params[:page]
-                model.records.page(params[:page]).per(25).without_count
+                page = params[:page].to_i - 1
+                offset = PER_PAGE * page
+                model.records.offset(offset).limit(PER_PAGE)
               elsif model
-                model.records.page(1).per(25).without_count
+                model.records.limit(PER_PAGE)
               else
                 []
               end
     p prepare(records)
   end
-
 end

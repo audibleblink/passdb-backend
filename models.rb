@@ -1,5 +1,4 @@
 require 'active_record'
-require 'kaminari/activerecord'
 
 class Password < ActiveRecord::Base
   has_many :records
@@ -28,6 +27,14 @@ class Record < ActiveRecord::Base
 
   def to_s
     "#{username.name}@#{domain.domain}:#{password.password}"
+  end
+
+  def to_hash
+    {
+      username: username.name,
+      domain: domain.domain,
+      password: password.password,
+    }
   end
 
 end
