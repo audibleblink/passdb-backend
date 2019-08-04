@@ -1,8 +1,8 @@
 require "yaml"
 require "active_record"
 
-task :default => ["query"] 
-task :query do
+task :default => ["console"] 
+task :console do
   require_relative 'db/query'
 end
 
@@ -17,6 +17,7 @@ namespace :db do
     ActiveRecord::Base.establish_connection(db_admin)
   end
 
+
   desc "Create the database"
   task :create => :admin do
     if ENV['RACK_ENV'] == DEV
@@ -27,6 +28,7 @@ namespace :db do
     end
     puts "Database created."
   end
+
 
   desc "Migrate the database"
   task :migrate => :env do
@@ -41,6 +43,7 @@ namespace :db do
       ActiveRecord::SchemaDumper.dump(ActiveRecord::Base.connection, file)
     end
   end
+
 
   desc "Table optimaztions"
   task :optimize => :env do
@@ -57,6 +60,7 @@ namespace :db do
     end
   end
 
+
   desc "Drop the database"
   task :drop => :admin do
     if ENV['RACK_ENV'] == DEV
@@ -68,6 +72,7 @@ namespace :db do
     puts "Database deleted."
   end
 
+
   desc "Reset the database"
   task :reset do
     Rake::Task["db:drop"].invoke
@@ -75,6 +80,7 @@ namespace :db do
     ActiveRecord::Base.establish_connection(DB_CONF)
     Rake::Task["db:migrate"].invoke
   end
+
 
   desc "Get table sizes for the database"
   task :stat => :env do
@@ -102,6 +108,7 @@ namespace :db do
 
   end
 
+
   desc "Get connection states"
   task :conn => :env do
     ActiveSupport::Deprecation.behavior = :silence
@@ -124,6 +131,7 @@ namespace :db do
     end
   end
 end
+
 
 namespace :g do
   desc "Generate migration"
@@ -148,6 +156,7 @@ end
     abort # needed stop other tasks
   end
 end
+
 
 namespace :bench do
   desc "Benchmark Insertion Rate"

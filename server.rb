@@ -3,8 +3,9 @@ require 'json'
 require_relative './db/database.rb'
 require_relative './models'
 
-PER_PAGE = 50
-before do 
+DEFAULT_PER_PAGE = 50
+
+before do
   response.headers['Access-Control-Allow-Origin'] = '*'
 end
 
@@ -42,12 +43,13 @@ helpers do
   end
 
   def paginated(model, params)
+    limit = params[:per_page] ? params[:per_page].to_i : DEFAULT_PER_PAGE
     records = if model && params[:page]
                 page = params[:page].to_i - 1
-                offset = PER_PAGE * page
-                model.records.offset(offset).limit(PER_PAGE)
+                offset = limit * page
+                model.records.offset(offset).limit(limit)
               elsif model
-                model.records.limit(PER_PAGE)
+                model.records.limit(limit)
               else
                 []
               end
