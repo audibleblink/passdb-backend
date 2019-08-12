@@ -1,5 +1,7 @@
 require 'sinatra'
 require 'json'
+require 'httparty'
+
 require_relative './db/database.rb'
 require_relative './models'
 
@@ -30,6 +32,25 @@ get '/emails/:email' do
     .where("usernames.name = ?", user)
     .where("domains.domain = ?", domain)
   prepare(emails)
+end
+
+get '/breaches/:email' do
+  url = "https://haveibeenpwned.com/api/v3/breachedaccount/#{params[:email]}?truncateResponse=false"
+  headers = {
+    "hibp-api-key" => ENV['HIBP_API_KEY'],
+    "user-agent" => 'script',
+  }
+  response = HTTParty.get(url, headers: headers)
+  response.map do |br|
+    {
+      Title: br['Title'],
+      Domain: br['Domain'],
+      Date: br['BreachDate'],
+      Count: br['PwnCount'],
+      Description: br['Description'],
+      LogoPath: br['LogoPath'],
+    }.to_json
+  end
 end
 
 
