@@ -7,6 +7,8 @@ class AddRecords < ActiveRecord::Migration
     end
 
     add_index :records, [:password_id, :domain_id, :username_id], unique: true
+    add_index :records, [:username_id, :domain_id]
+    add_index :records, [:username_id, :password_id]
   end
 
   def self.down
