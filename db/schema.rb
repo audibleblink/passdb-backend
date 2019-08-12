@@ -29,12 +29,14 @@ ActiveRecord::Schema.define(version: 20190726170600) do
   add_index "passwords", ["password"], name: "index_passwords_on_password", unique: true, using: :btree
 
   create_table "records", id: :bigserial, force: :cascade do |t|
-    t.integer "password_id", null: false
-    t.integer "domain_id",   null: false
-    t.integer "username_id", null: false
+    t.integer "password_id", limit: 8, null: false
+    t.integer "domain_id",   limit: 8, null: false
+    t.integer "username_id", limit: 8, null: false
   end
 
   add_index "records", ["password_id", "domain_id", "username_id"], name: "index_records_on_password_id_and_domain_id_and_username_id", unique: true, using: :btree
+  add_index "records", ["username_id", "domain_id"], name: "index_records_on_username_id_and_domain_id", using: :btree
+  add_index "records", ["username_id", "password_id"], name: "index_records_on_username_id_and_password_id", using: :btree
 
   create_table "usernames", id: :bigserial, force: :cascade do |t|
     t.string "name", null: false
