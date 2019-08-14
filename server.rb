@@ -49,8 +49,8 @@ get '/breaches/:email' do
       Count: br['PwnCount'],
       Description: br['Description'],
       LogoPath: br['LogoPath'],
-    }.to_json
-  end
+    }
+  end.to_json
 end
 
 
