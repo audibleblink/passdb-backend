@@ -161,13 +161,12 @@ func main() {
 				wg.Add(1)
 			}
 
-			fmt.Println("Closing goroutines for " + header.Name)
 			wg.Wait()
-			go reportStats(db, header.Name, counter)
+			go reportStats(db, header.Name, counter, false)
 			markDone(header.Name)
 		}
 	}
-	go alert("Completed tar: " + tarGzPath)
+	go reportStats(db, tarGzPath, counter, true)
 }
 
 // helper for making queries that return a single int
@@ -194,7 +193,7 @@ func count(db *sql.DB, table string) (int, error) {
 
 // send stats to a pushover acccount. called concurrently since our
 // data-processing doesn't rely an anything in here
-func reportStats(db *sql.DB, filename string, counter int) {
+func reportStats(db *sql.DB, filename string, counter int, pb bool) {
 	recordCount, err := count(db, "records")
 	if err != nil {
 		log.Printf("ALRT Unable to send: %s\n", err.Error())
@@ -206,7 +205,9 @@ func reportStats(db *sql.DB, filename string, counter int) {
 		counter,
 		recordCount,
 	)
-	alert(msg)
+	if pb {
+		alert(msg)
+	}
 }
 
 // takes a raw line, converts it into data the DB would want and attempts
