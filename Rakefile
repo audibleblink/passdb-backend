@@ -32,7 +32,7 @@ namespace :db do
 
   desc "Migrate the database"
   task :migrate => :env do
-    ActiveRecord::Migrator.migrate("db/migrate")
+    ActiveRecord::MigrationContext.new('db/migrate').migrate
 
     puts "Database migrated."
     Rake::Task["db:optimize"].invoke

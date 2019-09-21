@@ -1,4 +1,4 @@
-class AddDomains < ActiveRecord::Migration
+class AddDomains < ActiveRecord::Migration[5.2]
   def self.up
     create_table :domains, unlogged: true do |t|
       t.string :domain, null: false

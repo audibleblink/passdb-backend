@@ -1,4 +1,4 @@
-class AddRecords < ActiveRecord::Migration
+class AddRecords < ActiveRecord::Migration[5.2]
   def self.up
     create_table :records, unlogged: true do |t|
       t.references :password, null: false
