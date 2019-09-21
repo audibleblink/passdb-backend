@@ -154,6 +154,7 @@ func main() {
 			// iterate through the lines in the file, adding each to the workgroup
 			// before dispatching the line to the processing listener
 			lineReader := bufio.NewScanner(tarReader)
+			precount := count(db)
 			counter = 0
 			for lineReader.Scan() {
 				lineCh <- lineReader.Text()
@@ -162,11 +163,13 @@ func main() {
 			}
 
 			wg.Wait()
-			go reportStats(db, header.Name, counter, false)
+			postcount := count(db)
+			skipped := counter - (postcount - precount)
+			go reportStats(db, header.Name, counter, skipped, false)
 			markDone(header.Name)
 		}
 	}
-	go reportStats(db, tarGzPath, counter, true)
+	go reportStats(db, tarGzPath, 0, 0, true)
 }
 
 // helper for making queries that return a single int
@@ -184,27 +187,24 @@ func intQuery(db *sql.DB, query string) (int, error) {
 	return out, err
 }
 
-// not the best way to query count, but COUNT() takes incrementally
-// longer as the number of records grows
-func count(db *sql.DB, table string) (int, error) {
-	q := fmt.Sprintf(`SELECT MAX(id) FROM %s`, table)
-	return intQuery(db, q)
+func count(db *sql.DB) int {
+	num, _ := intQuery(db, "SELECT currval('total')")
+	return num
 }
 
 // send stats to a pushover acccount. called concurrently since our
 // data-processing doesn't rely an anything in here
-func reportStats(db *sql.DB, filename string, counter int, pb bool) {
-	recordCount, err := count(db, "records")
-	if err != nil {
-		log.Printf("ALRT Unable to send: %s\n", err.Error())
-	}
-
+func reportStats(db *sql.DB, filename string, counter, skipped int, pb bool) {
+	recordCount := count(db)
 	msg := fmt.Sprintf(
-		"Finished processing: %s\nProcessed: %d\nTotal: %d",
+		"Finished processing: %s\nProcessed: %d\nSkipped: %d\nTotal: %d\n",
 		filename,
 		counter,
+		skipped,
 		recordCount,
 	)
+
+	fmt.Println(msg)
 	if pb {
 		alert(msg)
 	}
@@ -263,7 +263,12 @@ func upsert(db *sql.DB, user, domain, password string) error {
 		return err
 	}
 
+	updateCount(db)
 	return tx.Commit()
+}
+
+func updateCount(db *sql.DB) {
+	intQuery(db, "SELECT nextval('total')")
 }
 
 // contains the logic for breaking a line into desired username
