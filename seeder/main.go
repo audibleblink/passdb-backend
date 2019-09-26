@@ -114,7 +114,7 @@ func main() {
 	tarReader := tar.NewReader(gzf)
 
 	var counter int
-	go alert("Starting: " + tarGzPath)
+	go alert("Starting TARGZ: " + tarGzPath)
 	for {
 		header, err := tarReader.Next()
 		if err != nil {
@@ -136,7 +136,7 @@ func main() {
 			// process lines in the background as they come in to the lineCh channel
 			// processing has not yet begun, but this 'listener' needs to be set up
 			// first
-			fmt.Println("Starting " + header.Name)
+			fmt.Println("Starting file: " + header.Name)
 			limit := limiter.NewConcurrencyLimiter(routines)
 			go func(
 				wgi *sync.WaitGroup,

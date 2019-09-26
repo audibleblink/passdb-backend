@@ -74,6 +74,6 @@ helpers do
               else
                 []
               end
-    p prepare(records)
+    prepare(records)
   end
 end
