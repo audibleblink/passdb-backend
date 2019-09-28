@@ -19,8 +19,8 @@ import (
 )
 
 const (
-	connLimit   = 100
-	routines    = 50
+	connLimit   = 20
+	routines    = 10
 	doneLog     = "done.log"
 	errLog      = "done.err"
 	testTar     = "../tests/test_data.tar.gz"
