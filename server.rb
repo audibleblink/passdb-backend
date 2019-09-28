@@ -1,10 +1,11 @@
 require 'sinatra'
 require 'json'
-require 'httparty'
 
 require_relative './db/database.rb'
 require_relative './models'
+require_relative './hibp'
 
+HIBP_CLIENT = HIBP.new(ENV['HIBP_API_KEY'])
 DEFAULT_PER_PAGE = 50
 
 before do
@@ -35,12 +36,7 @@ get '/emails/:email' do
 end
 
 get '/breaches/:email' do
-  url = "https://haveibeenpwned.com/api/v3/breachedaccount/#{params[:email]}?truncateResponse=false"
-  headers = {
-    "hibp-api-key" => ENV['HIBP_API_KEY'],
-    "user-agent" => 'script',
-  }
-  response = HTTParty.get(url, headers: headers)
+  response = HIBP_CLIENT.breach(params[:email])
   response.map do |br|
     {
       Title: br['Title'],
@@ -53,9 +49,7 @@ get '/breaches/:email' do
   end.to_json
 end
 
-
 helpers do
-
   def prepare(records)
     records
       .map(&:to_hash)
