@@ -1,10 +1,10 @@
 production:
-  host: 'localhost'
+  host: <%= ENV['PG_HOST'] %>
+  database: <%= ENV['DB_NAME'] %>
+  username: <%= ENV['DB_USER'] %>
+  password: <%= ENV['DB_PASS'] %>
   adapter: 'postgresql'
   encoding: utf-8
-  database: 'passdb'
-  username: 'postgres'
-  password: 'passdb_pass'
 
 development:
   adapter: 'sqlite3'

@@ -1,4 +1,5 @@
 require "yaml"
+require "erb"
 require "active_record"
 
 task :default => ["console"] 
