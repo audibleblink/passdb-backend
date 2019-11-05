@@ -93,6 +93,9 @@ func main() {
 	db.SetMaxIdleConns(connLimit)
 	db.SetConnMaxLifetime(connLimit * time.Second)
 
+	// initiate count for this connection
+	updateCount(db)
+
 	var tarGzPath string
 	if os.Getenv("TEST") != "" {
 		tarGzPath = testTar
@@ -126,6 +129,11 @@ func main() {
 
 		if header.Typeflag == tar.TypeReg {
 			if alreadyRan(header.Name) {
+				fmt.Printf("Skipping: %s\n", header.Name)
+				continue
+			}
+
+			if !strings.HasSuffix(header.Name, ".txt") {
 				fmt.Printf("Skipping: %s\n", header.Name)
 				continue
 			}
