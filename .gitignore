@@ -1,5 +1,5 @@
 seeder/*
-!seeder/main.go
+!seeder/*.go
 !seeder/go.sum
 !seeder/go.mode
 
