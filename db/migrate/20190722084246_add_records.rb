@@ -5,10 +5,6 @@ class AddRecords < ActiveRecord::Migration[5.2]
       t.references :domain, null: false
       t.references :username, null: false
     end
-
-    add_index :records, [:password_id, :domain_id, :username_id], unique: true
-    add_index :records, [:username_id, :domain_id]
-    add_index :records, [:username_id, :password_id]
   end
 
   def self.down

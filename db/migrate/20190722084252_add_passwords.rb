@@ -3,8 +3,6 @@ class AddPasswords < ActiveRecord::Migration[5.2]
     create_table :passwords, unlogged: true do |t|
       t.string :password, null: false
     end
-
-    add_index :passwords, :password, unique: true
   end
 
   def self.down
