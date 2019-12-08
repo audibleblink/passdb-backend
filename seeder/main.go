@@ -19,16 +19,16 @@ import (
 )
 
 const (
-	connLimit   = 20
-	routines    = 10
+	connLimit   = 16
+	routines    = 8
 	doneLog     = "done.log"
 	errLog      = "done.err"
 	testTar     = "../tests/test_data.tar.gz"
 	upsertQuery = `
 		WITH ins1 AS (
-			INSERT INTO usernames(name) VALUES ($1)
-			ON CONFLICT (name) DO UPDATE SET name=EXCLUDED.name
-			RETURNING id AS user_id
+			INSERT INTO usernames(username) VALUES ($1)
+			ON CONFLICT (username) DO UPDATE SET username=EXCLUDED.username
+			RETURNING id AS username_id
 		)
 		, ins2 AS (
 			INSERT INTO passwords(password) VALUES ($2)
@@ -43,7 +43,7 @@ const (
 
 		INSERT INTO records (username_id, password_id, domain_id)
 		VALUES (
-			(select user_id from ins1), 
+			(select username_id from ins1), 
 			(select pass_id from ins2), 
 			(select domain_id from ins3) 
 		)`
@@ -139,7 +139,7 @@ func main() {
 			}
 
 			var wg sync.WaitGroup
-			lineCh := make(chan string, routines)
+			lineCh := make(chan string, routines*2)
 
 			// process lines in the background as they come in to the lineCh channel
 			// processing has not yet begun, but this 'listener' needs to be set up
@@ -173,11 +173,11 @@ func main() {
 			wg.Wait()
 			postcount := count(db)
 			skipped := counter - (postcount - precount)
-			go reportStats(db, header.Name, counter, skipped, false)
+			go reportStats(db, header.Name, counter, skipped, postcount, false)
 			markDone(header.Name)
 		}
 	}
-	go reportStats(db, tarGzPath, 0, 0, true)
+	go reportStats(db, tarGzPath, 0, 0, count(db), true)
 }
 
 // helper for making queries that return a single int
@@ -196,20 +196,19 @@ func intQuery(db *sql.DB, query string) (int, error) {
 }
 
 func count(db *sql.DB) int {
-	num, _ := intQuery(db, "SELECT currval('total')")
+	num, _ := intQuery(db, "SELECT nextval('total')")
 	return num
 }
 
 // send stats to a pushover acccount. called concurrently since our
 // data-processing doesn't rely an anything in here
-func reportStats(db *sql.DB, filename string, counter, skipped int, pb bool) {
-	recordCount := count(db)
+func reportStats(db *sql.DB, filename string, counter, skipped, total int, pb bool) {
 	msg := fmt.Sprintf(
 		"Finished processing: %s\nProcessed: %d\nSkipped: %d\nTotal: %d\n",
 		filename,
 		counter,
 		skipped,
-		recordCount,
+		total,
 	)
 
 	fmt.Println(msg)
@@ -291,19 +290,19 @@ func parse(line string) (user, domain, password string) {
 	}
 
 	if len(userAndRest) == 2 {
-		user = userAndRest[0]
+		user = strings.ToLower(userAndRest[0])
 	}
 
 	domainAndPass := strings.SplitN(userAndRest[1], ":", 2)
 	if len(domainAndPass) == 2 {
-		domain = domainAndPass[0]
+		domain = strings.ToLower(domainAndPass[0])
 		password = domainAndPass[1]
 		return
 	}
 
 	domainAndPass = strings.SplitN(userAndRest[1], ";", 2)
 	if len(domainAndPass) == 2 {
-		domain = domainAndPass[0]
+		domain = strings.ToLower(domainAndPass[0])
 		password = domainAndPass[1]
 		return
 	}

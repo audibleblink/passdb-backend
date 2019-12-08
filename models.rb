@@ -26,12 +26,12 @@ class Record < ActiveRecord::Base
   default_scope { includes(:username, :password, :domain) }
 
   def to_s
-    "#{username.name}@#{domain.domain}:#{password.password}"
+    "#{username.username}@#{domain.domain}:#{password.password}"
   end
 
   def to_hash
     {
-      username: username.name,
+      username: username.username,
       domain: domain.domain,
       password: password.password,
     }

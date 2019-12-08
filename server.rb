@@ -18,7 +18,7 @@ get '/domains/:domain' do
 end
 
 get '/usernames/:name' do
-  user = Username.find_by(name: params[:name])
+  user = Username.find_by(username: params[:name])
   paginated(user, params)
 end
 
