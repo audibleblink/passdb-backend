@@ -52,8 +52,8 @@ namespace :db do
       puts 'PROD only'
     else
       %w(records passwords domains usernames).each do |table|
-        q = "ALTER TABLE #{table} SET (autovacuum_enabled = false)"
-        ActiveRecord::Base.connection.exec_query(q)
+        # q = "ALTER TABLE #{table} SET (autovacuum_enabled = false)"
+        # ActiveRecord::Base.connection.exec_query(q)
         q = "ALTER TABLE #{table} SET UNLOGGED"
         ActiveRecord::Base.connection.exec_query(q)
       end
