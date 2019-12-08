@@ -112,8 +112,8 @@ func processAndSave(wg *sync.WaitGroup, lineText string) {
 // idempotent given the ON CONFLICT clause in the query. #upsert
 // returns a pq.Error
 func upsert(user, domain, password string) (err error) {
-	logger(userLog, user)
-	logger(domainLog, domain)
+	logger(userLog, strings.ToLower(user))
+	logger(domainLog, strings.ToLower(domain))
 	logger(passwdLog, password)
 	return
 }

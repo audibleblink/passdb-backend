@@ -78,8 +78,8 @@ func processAndSave(wg *sync.WaitGroup, lineText string) {
 }
 
 func upsert(user, domain, password string) (err error) {
-	logger(userLog, user)
-	logger(domainLog, domain)
+	logger(userLog, strings.ToLower(user))
+	logger(domainLog, strings.ToLower(domain))
 	logger(passwdLog, password)
 	return
 }
@@ -89,6 +89,7 @@ func parse(line string) (user, domain, password string) {
 
 	matches := mailRE.FindSubmatch([]byte(line))
 
+	fmt.Println(matches)
 	if len(matches) != 3 {
 		return
 	}
