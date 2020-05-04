@@ -32,12 +32,16 @@ class Record
   end
 
   def self.query_and_build(query, params)
-    data = @@bq.query(query, params: params)
+    data = bq.query(query, params: params)
     data.map { |d| new(d) }
   end
 
   def self.table
     @@table
+  end
+
+  def self.bq
+    @@bq
   end
 end
 

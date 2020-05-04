@@ -1,135 +1,83 @@
-# passdb
+# PassDB
 
-Password-dump database normalizer, seeder, and API server.
+Password-dump database API server. See accompanying blog post for details
+on setting up GCP Dataprep, Storage, and BigQuery
 
-## DB Setup
+### Seeding
 
-Depending on the data drive, add one of the `conf` files from the `db` directory to 
-Postgres' `conf.d` dir.
+Dump entries should be in the format:
 
 ```
-cp db/16gb_4cpu_ssd.conf /etc/postgres/10/main/conf.d/dump.conf
-systemctl restart postgres@10-main.service
+username,domain,password
+
+# where
+test@example.com:p4$$w0rd
+
+# becomes
+test,example.com,p4$$w0rd
 ```
 
-Currently averaging around 350K inserts/minute with these settings.
+Feel free to do this manually, though I had great success and enjoyment using GCP Dataprep
+
+Once in the proper format, you can create the table and import the csv using the GCP Console,
+the, GCP CLI tool, or the included rake commands.
+
+```bash
+bundle exec rake db:create
+bundle exec rake db:load[dumps.csv]
+```
+
+This will take a while. You may want to manully upload to GCP storage and copy in the
+data from there because should the upload fail with Rake, you'll have to start all over,
+and burn through more of your bandwidth.
 
 ## Usage
 
 The following enivironment varilables are necessary
 
-```
-# Required for rake and API
-PG_HOST=localhost
-DB_NAME=passdb
-DB_USER=passdb_user
-DB_PASS=passdb_pass
+```bash
+# Project Name
+export GOOGLE_CLOUD_PROJECT=
 
-# Required for API server
-HIBP_API_KEY=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+# Format: $project.$dataset.$tablename
+export GOOGLE_BIGQUERY_TABLE=
 
-# Required for seeder
-PG_CONN=postgres://${DB_USER}:${DB_PASS}@${PG_HOST}/${DB_NAME}
-PO_USR=ii5299VZk7DCXcntrnkxXMalEb2Hph # pushover.net for mobile notifications
-PO_API=abtnpi5eht2qckz67s6j5xfpoe83tg # pushover.net for mobile notifications
+# Obtained from GCP Console
+export GOOGLE_CLOUD_KEYFILE_JSON=./credentials.json
+
+# Have I Been Pwned API key
+export HIBP_API_KEY=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
-### Seeding
+Install the project deps with:
 
-There's a test tar in the `tests` dir
-
-Dump entries should be in the format:
-
-```
-email@domain.com:password
-```
-
-The parsing logic in `seeder` takes a best-effort approach to pulling `domain`, `username`, and
-`password` from each line. Some dumps use `;` instead of `:` as a field seperator. The `seeder`
-will account for that. Apart from that, if it can't find all three datapoints in the line, it isn't
-added to the database.
-
-```
-# for psql
-export RACK_ENV=production
-
-# setup the db
+```bash
+gem install bundle
 bundle install
-bundle exec rake db:reset
-
-# build golang seeder
-cd seeder && go build main.go
-
-# macos' postgres wants this string instead
-export PG_CONN='postgres://passdb_user:passdb_pass@localhost/passdb?ssl_mode=disabled'
-
-# seed the database
-./seeder test_data.tar.gz
 ```
 
-### Manual Querying
+`server.rb` starts a JSON API for use with the passdb-frontend. 
 
-Associations are set in the ORM such that pivotting on any of `username`, `password`, or `domain`
-is possible
-
-```
-# to start the query interface
-bundle exec rake
-
-
-# start with a domain
-yahoo = Domain.find_by(domain: "yahoo.com")
-
-# find all passwords by yahoo mail users
-yahoo.passwords
-
-# find all yahoo mail users
-yahoo.usernames
-
-# find all password of a particular yahoo mail user
-yahoo.usernames.first.passwords
-
-
-
-# start with a user
-eric = Usernames.find_by(name: "eric1990")
-
-# see all passwords belonging to eric
-eric.passwords
-
-# see all email account for eric
-eric.domains
-
-
-
-# starting with a password
-pass = Password.find_by(password: "P@ssw0rd!")
-
-# see the users that share this password
-pass.usernames
+```bash
+bundle exec ruby server.rb 
 ```
 
-### The API
-`server.rb` starts a JSON API for use with the passdb-frontend. If you have a ruby environment set
-up, simply `bundle exec ruby server.rb`. If not, using docker will be less of a headache.
+If you don't have a ruby environment set, using docker will be less of a headache.
 
 ```
 # build the image
 docker build -t passdb-server .
 
-# run the container, passing the necessary environment variables
-docker run --env-file .env passdb-server
+# run the container, passing the necessary environment variables, port maps, and volume mounts
+docker run --env-file .env -p 4567:4567 -v $FOLDER_CONTAINING_DUMPS:/app passdb-server bash
 ```
 
-## Stats
+### Stats
 
-Run `rake -T` to see all tasks. 
+Run `bundle exec rake -T` to see all tasks. 
 
-You can pull table sizes, current connection pool utilization 
+You can pull table sizes and counts using:
 
-Stats below taken at 8 million entries:
-![](https://i.imgur.com/4ej5HlH.png)
-
-
-Seeder benchmarks with `bundle exec rake bench:insert`
-![](https://i.imgur.com/HGqhUJf.png)
+```bash
+$ bundle exec rake db:stats
+```
