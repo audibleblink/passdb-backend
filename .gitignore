@@ -4,3 +4,4 @@ seeder/*
 !seeder/go.mode
 
 .env
+credentials.json

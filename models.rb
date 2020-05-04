@@ -1,41 +1,43 @@
-require 'active_record'
+require "google/cloud/bigquery"
 
-class Password < ActiveRecord::Base
-  has_many :records
-  has_many :usernames, through: :records
-  has_many :domains, through: :records
-end
+class Record 
+  attr_reader :username, :domain, :password
 
-class Domain < ActiveRecord::Base
-  has_many :records
-  has_many :passwords, through: :records
-  has_many :usernames, through: :records
-end
+  @@bq = Google::Cloud::Bigquery.new 
+  @@table = ENV['GOOGLE_BIGQUERY_TABLE']
 
-class Username < ActiveRecord::Base
-  has_many :records
-  has_many :passwords, through: :records
-  has_many :domains, through: :records
-end
+  def initialize(username:, domain:, password:)
+    @username = username
+    @domain   = domain
+    @password = password
+  end
 
-class Record < ActiveRecord::Base
-  belongs_to :domain
-  belongs_to :password
-  belongs_to :username
+  def self.find_by(hash={})
+    column, value = hash.first
+    query = "SELECT DISTINCT * FROM #{table} WHERE #{column} = @#{column}"
+    query_and_build(query, column => value)
+  end
 
-  default_scope { includes(:username, :password, :domain) }
+  def self.find_by_email(username, domain)
+    query = "SELECT DISTINCT * FROM #{table} WHERE username = @username AND domain = @domain"
+    query_and_build(query, username: username, domain: domain)
+  end
 
-  def to_s
-    "#{username.username}@#{domain.domain}:#{password.password}"
+  def to_raw
+    "#{username}@#{domain}:#{password}"
   end
 
   def to_hash
-    {
-      username: username.username,
-      domain: domain.domain,
-      password: password.password,
-    }
+    { username: username, domain: domain, password: password }
   end
 
+  def self.query_and_build(query, params)
+    data = @@bq.query(query, params: params)
+    data.map { |d| new(d) }
+  end
+
+  def self.table
+    @@table
+  end
 end
 
