@@ -30,7 +30,7 @@ end
 get '/emails/:email' do
   user, domain = params[:email].split('@')
   emails = Record.joins(:username)
-    .where("usernames.name = ?", user)
+    .where("usernames.username = ?", user)
     .where("domains.domain = ?", domain)
   prepare(emails)
 end
