@@ -19,11 +19,10 @@ import (
 )
 
 const (
-	connLimit   = 16
-	routines    = 8
+	connLimit   = 8
+	routines    = 4
 	doneLog     = "done.log"
 	errLog      = "done.err"
-	testTar     = "../tests/test_data.tar.gz"
 	upsertQuery = `
 		WITH ins1 AS (
 			INSERT INTO usernames(username) VALUES ($1)
@@ -47,14 +46,34 @@ const (
 			(select pass_id from ins2), 
 			(select domain_id from ins3) 
 		)`
+
+	// to be used with initial assocciation creation after importing the original
+	// individual table data with COPY
+	insertQuery = `
+		WITH ins1 AS (
+			SELECT id from usernames WHERE username=$1
+		)
+		, ins2 AS (
+			SELECT id from passwords WHERE password=$2
+		)
+		, ins3 AS (
+			SELECT id from domains WHERE domain=$3
+		)
+
+		INSERT INTO records (username_id, password_id, domain_id)
+		VALUES (
+			(select id from ins1), 
+			(select id from ins2), 
+			(select id from ins3) 
+		)`
 )
 
 var (
 	finished map[string]bool
 )
 
-// sets up the progress map so we can skip files that have already been processed
 func init() {
+	// progres log file setup
 	progressFile, err := os.Open(doneLog)
 	finished = make(map[string]bool)
 	if err != nil {
@@ -67,6 +86,7 @@ func init() {
 	}
 	defer progressFile.Close()
 
+	// progress map setup
 	fileScanner := bufio.NewScanner(progressFile)
 	for fileScanner.Scan() {
 		f := fileScanner.Text()
@@ -97,11 +117,7 @@ func main() {
 	updateCount(db)
 
 	var tarGzPath string
-	if os.Getenv("TEST") != "" {
-		tarGzPath = testTar
-	} else {
-		tarGzPath = os.Args[1]
-	}
+	tarGzPath = os.Args[1]
 
 	tarGz, err := os.Open(tarGzPath)
 	if err != nil {
@@ -133,10 +149,10 @@ func main() {
 				continue
 			}
 
-			if !strings.HasSuffix(header.Name, ".txt") {
-				fmt.Printf("Skipping: %s\n", header.Name)
-				continue
-			}
+			// if !strings.HasSuffix(header.Name, ".txt") {
+			// 	fmt.Printf("Skipping: %s\n", header.Name)
+			// 	continue
+			// }
 
 			var wg sync.WaitGroup
 			lineCh := make(chan string, routines*2)
@@ -226,22 +242,28 @@ func processAndSave(wg *sync.WaitGroup, db *sql.DB, lineText string) {
 	err := upsert(db, user, domain, password)
 
 	if err != nil {
-		pqErr := (err).(*pq.Error)
-		switch pqErr.Code.Name() {
-		case "unique_violation":
-			// do nothing, there are a lot of these
-			// especially when restarting import jobs
-		case "character_not_in_repertoire":
-			go log.Printf(
-				"ENC line=%s|username=%s|domain=%s|password=%s|msg=%s",
-				lineText,
-				user,
-				domain,
-				password,
-				pqErr.Message,
-			)
-		default:
-			log.Printf("ERR %s - %s", lineText, pqErr.Message)
+		pqErr, ok := err.(*pq.Error)
+		if ok {
+
+			switch pqErr.Code.Name() {
+			case "unique_violation":
+				log.Printf("PQERR %s - %s", lineText, pqErr.Message)
+				// do nothing, there are a lot of these
+				// especially when restarting import jobs
+			case "character_not_in_repertoire":
+				go log.Printf(
+					"ENC line=%s|username=%s|domain=%s|password=%s|msg=%s",
+					lineText,
+					user,
+					domain,
+					password,
+					pqErr.Message,
+				)
+			default:
+				log.Printf("PQERR %s - %s", lineText, pqErr.Message)
+			}
+		} else {
+			log.Printf("ERR %s - %s", lineText, err.Error())
 		}
 	}
 }
@@ -257,7 +279,7 @@ func upsert(db *sql.DB, user, domain, password string) error {
 		return err
 	}
 
-	preparedQuery, err := tx.Prepare(upsertQuery)
+	preparedQuery, err := tx.Prepare(insertQuery)
 	if err != nil {
 		tx.Rollback()
 		return err

@@ -20,7 +20,7 @@ var (
 	errLog    = "error.log"
 
 	//procs - 1
-	routines = 7
+	routines = 3
 )
 
 func main() {
@@ -89,7 +89,6 @@ func parse(line string) (user, domain, password string) {
 
 	matches := mailRE.FindSubmatch([]byte(line))
 
-	fmt.Println(matches)
 	if len(matches) != 3 {
 		return
 	}
