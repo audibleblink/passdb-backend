@@ -1,7 +1,8 @@
 # PassDB
 
-Password-dump database API server. See accompanying blog post for details
-on setting up GCP Dataprep, Storage, and BigQuery
+Password-dump database API server. See accompanying 
+[blog post](https://sec.alexflor.es/posts/2020/05/password-dump-database-part-2/) 
+for more details.
 
 ### Seeding
 
@@ -17,18 +18,18 @@ test@example.com:p4$$w0rd
 test,example.com,p4$$w0rd
 ```
 
-Feel free to do this manually, though I had great success and enjoyment using GCP Dataprep
+Feel free to do this manually, though I had great success using GCP Dataprep
 
 Once in the proper format, you can create the table and import the csv using the GCP Console,
-the, GCP CLI tool, or the included rake commands.
+the GCP CLI tool, or the included rake commands.
 
 ```bash
 bundle exec rake db:create
 bundle exec rake db:load[dumps.csv]
 ```
 
-This will take a while. You may want to manully upload to GCP storage and copy in the
-data from there because should the upload fail with Rake, you'll have to start all over,
+This will take a while. You may want to manully upload to GCP Storage and copy in the
+data from there because if the upload fails with Rake, you'll have to start all over,
 and burn through more of your bandwidth.
 
 ## Usage
@@ -42,11 +43,11 @@ export GOOGLE_CLOUD_PROJECT=
 # Format: $project.$dataset.$tablename
 export GOOGLE_BIGQUERY_TABLE=
 
-# Obtained from GCP Console
+# Obtained from the GCP Auth Console
 export GOOGLE_CLOUD_KEYFILE_JSON=./credentials.json
 
 # Have I Been Pwned API key
-export HIBP_API_KEY=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+export HIBP_API_KEY=
 ```
 
 Install the project deps with:
@@ -62,14 +63,14 @@ bundle install
 bundle exec ruby server.rb 
 ```
 
-If you don't have a ruby environment set, using docker will be less of a headache.
+If you don't have a ruby environment set up, using docker may be less of a headache.
 
 ```
 # build the image
 docker build -t passdb-server .
 
 # run the container, passing the necessary environment variables, port maps, and volume mounts
-docker run --env-file .env -p 4567:4567 -v $FOLDER_CONTAINING_DUMPS:/app passdb-server bash
+docker run --env-file .env -p 4567:4567 passdb-server bash
 ```
 
 ### Stats
@@ -80,4 +81,13 @@ You can pull table sizes and counts using:
 
 ```bash
 $ bundle exec rake db:stats
+
+Stats for passdb
+========================================
+Bytes:   150057615285
+Rows:    3658006353
+Unique
+  Usernames: 1164102376
+  Domain:    27389067
+  Password:  887268363
 ```
