@@ -79,7 +79,6 @@ GEM
       rack (~> 2.0)
       rack-protection (= 2.0.7)
       tilt (~> 2.0)
-    sqlite3 (1.3.13)
     tilt (2.0.9)
     uber (0.1.0)
 
@@ -92,7 +91,6 @@ DEPENDENCIES
   pry-byebug
   rake
   sinatra
-  sqlite3 (~> 1.3.6)
 
 BUNDLED WITH
    1.17.2
