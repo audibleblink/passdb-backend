@@ -38,56 +38,21 @@ The following enivironment varilables are necessary
 
 ```bash
 # Project Name
-export GOOGLE_CLOUD_PROJECT=
+GOOGLE_CLOUD_PROJECT=
 
 # Format: $project.$dataset.$tablename
-export GOOGLE_BIGQUERY_TABLE=
+GOOGLE_BIGQUERY_TABLE=
 
 # Obtained from the GCP Auth Console
-export GOOGLE_APPLICATION_CREDENTIALS=./credentials.json
+GOOGLE_APPLICATION_CREDENTIALS=./credentials.json
 
 # Have I Been Pwned API key
-export HIBP_API_KEY=
+HIBP_API_KEY=
 ```
 
-Install the project deps with:
+Run:
 
 ```bash
-gem install bundle
-bundle install
-```
-
-`server.rb` starts a JSON API for use with the passdb-frontend. 
-
-```bash
-bundle exec ruby server.rb 
-```
-
-If you don't have a ruby environment set up, using docker may be less of a headache.
-
-```
-# build the image
-docker build -t passdb-server .
-
-# run the container, passing the necessary environment variables, port maps, and volume mounts
-docker run --env-file .env -p 4567:4567 passdb-server bash
-```
-
-### Stats
-
-Run `bundle exec rake -T` to see all tasks. 
-
-You can pull table sizes and counts using:
-
-```bash
-$ bundle exec rake db:stats
-
-Stats for passdb
-========================================
-Bytes:   150057615285
-Rows:    3658006353
-Unique
-  Usernames: 1164102376
-  Domain:    27389067
-  Password:  887268363
+source .env
+go run main.go
 ```
