@@ -1,7 +1,2 @@
-seeder/*
-!seeder/*.go
-!seeder/go.sum
-!seeder/go.mode
-
 .env
 credentials.json

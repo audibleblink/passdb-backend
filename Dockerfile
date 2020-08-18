@@ -1,11 +1,11 @@
-FROM ruby:2.6.3
+FROM golang:1.15
 
 WORKDIR /app
-COPY Gemfile* ./
-RUN bundle install
+COPY go.* .
+RUN go mod download
 
 COPY . .
-CMD ["bundle", "exec", "ruby", "server.rb"]
+CMD ["go", "run", "main.go"]
 
 # $ docker build -t passdb-server .
 # $ docker run --env-file .env passdb-server

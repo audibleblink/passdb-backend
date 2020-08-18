@@ -44,7 +44,7 @@ export GOOGLE_CLOUD_PROJECT=
 export GOOGLE_BIGQUERY_TABLE=
 
 # Obtained from the GCP Auth Console
-export GOOGLE_CLOUD_KEYFILE_JSON=./credentials.json
+export GOOGLE_APPLICATION_CREDENTIALS=./credentials.json
 
 # Have I Been Pwned API key
 export HIBP_API_KEY=
