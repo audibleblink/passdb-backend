@@ -72,9 +72,9 @@ func main() {
 }
 
 type record struct {
-	Username string `json:"username"`
-	Domain   string `json:"domain"`
-	Password string `json:"password"`
+	Username bigquery.NullString `json:"username"`
+	Domain   bigquery.NullString `json:"domain"`
+	Password bigquery.NullString `json:"password"`
 }
 
 type breach struct {
