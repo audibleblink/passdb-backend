@@ -6,7 +6,29 @@ for more details.
 
 See also [accompanying frontend](https://github.com/audibleblink/passdb-frontend)
 
-### Seeding
+## API
+
+```
+GET /usernames/{username}
+GET /domains/{domain}
+GET /passwords/{password}
+GET /emails/{email}
+# response =>  [{"username": "abc", "domain": "example.com", "password": "p4ssw0rd"}, ...]
+
+
+# Breach info in which the given email was found
+GET /breaches/{email}
+# response => [{
+  "Title": ...,
+  "Domain": ...,
+  "Date": ...,
+  "Count": ...,
+  "Description": ...,
+  "LogoPath": ...,
+},...]
+```
+
+## Seeding
 
 Torrents:
 ```
