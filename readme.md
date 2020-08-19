@@ -4,7 +4,18 @@ Password-dump database API server. See accompanying
 [blog post](https://sec.alexflor.es/posts/2020/05/password-dump-database-part-2/) 
 for more details.
 
+See also [accompanying frontend](https://github.com/audibleblink/passdb-frontend)
+
 ### Seeding
+
+Torrents:
+```
+# Collection #1
+magnet:?xt=urn:btih:b39c603c7e18db8262067c5926e7d5ea5d20e12e&dn=Collection+1
+
+# Collections #2 - #5
+magnet:?xt=urn:btih:d136b1adde531f38311fbf43fb96fc26df1a34cd&dn=Collection+%232-%235+%26+Antipublic
+```
 
 Dump entries should be in the format:
 
@@ -24,8 +35,8 @@ Once in the proper format, you can create the table and import the csv using the
 the GCP CLI tool, or from the web portal
 
 This will take a while. You may want to manully upload to GCP Storage and copy in the
-data from there because if the upload fails with Rake, you'll have to start all over,
-and burn through more of your bandwidth.
+data from there because if the upload fails with the GCP CLI, you'll have to start all over,
+and burn through more of your bandwidth (and credits).
 
 ## Usage
 
@@ -49,5 +60,5 @@ Run:
 
 ```bash
 source .env
-go run main.go
+go run main.go [port]
 ```

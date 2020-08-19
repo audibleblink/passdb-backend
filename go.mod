@@ -5,6 +5,7 @@ go 1.15
 require (
 	cloud.google.com/go/bigquery v1.10.0
 	github.com/go-chi/chi v4.1.2+incompatible
+	github.com/go-chi/cors v1.1.1
 	golang.org/x/net v0.0.0-20200813134508-3edf25e44fcc // indirect
 	google.golang.org/api v0.29.0
 )

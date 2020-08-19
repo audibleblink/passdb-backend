@@ -15,6 +15,7 @@ import (
 	"github.com/audibleblink/passdb/hibp"
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
+	"github.com/go-chi/cors"
 )
 
 var (
@@ -52,6 +53,9 @@ func main() {
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
+	r.Use(cors.Handler(cors.Options{
+		AllowedOrigins: []string{"*"},
+	}))
 
 	r.Get("/usernames/{username}", handleUsername)
 	r.Get("/passwords/{password}", handlePassword)
@@ -68,9 +72,9 @@ func main() {
 }
 
 type record struct {
-	Username string
-	Domain   string
-	Password string
+	Username string `json:"username"`
+	Domain   string `json:"domain"`
+	Password string `json:"password"`
 }
 
 type breach struct {
