@@ -9,12 +9,10 @@ import (
 	"os"
 	"strings"
 
-	hibp "github.com/audibleblink/haveibeenpwned"
-
+	"cloud.google.com/go/bigquery"
 	"google.golang.org/api/iterator"
 
-	"cloud.google.com/go/bigquery"
-
+	"github.com/audibleblink/passdb/hibp"
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
 )
@@ -25,6 +23,8 @@ var (
 	googleCred    = os.Getenv("GOOGLE_APPLICATION_CREDENTIALS")
 	hibpKey       = os.Getenv("HIBP_API_KEY")
 
+	port = "3000"
+
 	bq *bigquery.Client
 )
 
@@ -33,6 +33,10 @@ func init() {
 	if projectID == "" || bigQueryTable == "" || googleCred == "" || hibpKey == "" {
 		err = fmt.Errorf("missing required environment variables")
 		log.Fatal(err)
+	}
+
+	if len(os.Args) > 1 {
+		port = os.Args[1]
 	}
 
 	ctx := context.Background()
@@ -55,19 +59,21 @@ func main() {
 	r.Get("/emails/{email}", handleEmail)
 	r.Get("/breaches/{email}", handleBreaches)
 
-	err := http.ListenAndServe(":3000", r)
+	listen := fmt.Sprintf("127.0.0.1:%s", port)
+	log.Printf("Starting server on %s\n", listen)
+	err := http.ListenAndServe(listen, r)
 	if err != nil {
 		log.Fatal(err)
 	}
 }
 
-type Record struct {
+type record struct {
 	Username string
 	Domain   string
 	Password string
 }
 
-type Breach struct {
+type breach struct {
 	Title       string
 	Domain      string
 	Date        string
@@ -124,9 +130,9 @@ func handleBreaches(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var breaches []*Breach
+	var breaches []*breach
 	for _, hibpBreach := range hibpBreaches {
-		breach := &Breach{
+		breach := &breach{
 			Title:       hibpBreach.Title,
 			Domain:      hibpBreach.Domain,
 			Date:        hibpBreach.BreachDate,
@@ -145,19 +151,19 @@ func handleBreaches(w http.ResponseWriter, r *http.Request) {
 	w.Write(data)
 }
 
-func recordsByUsername(username string) (records []*Record, err error) {
+func recordsByUsername(username string) (records []*record, err error) {
 	return recordsBy("username", username)
 }
 
-func recordsByPassword(password string) (records []*Record, err error) {
+func recordsByPassword(password string) (records []*record, err error) {
 	return recordsBy("password", password)
 }
 
-func recordsByDomain(domain string) (records []*Record, err error) {
+func recordsByDomain(domain string) (records []*record, err error) {
 	return recordsBy("domain", domain)
 }
 
-func recordsByEmail(email string) (records []*Record, err error) {
+func recordsByEmail(email string) (records []*record, err error) {
 	usernameAndDomain := strings.Split(email, "@")
 	if len(usernameAndDomain) != 2 {
 		err = fmt.Errorf("invalid email format")
@@ -169,7 +175,12 @@ func recordsByEmail(email string) (records []*Record, err error) {
 	return queryRecords(queryString)
 }
 
-func queryRecords(queryString string) (records []*Record, err error) {
+func recordsBy(column, value string) (records []*record, err error) {
+	queryString := fmt.Sprintf(`SELECT DISTINCT * FROM %s WHERE %s = "%s"`, bigQueryTable, column, value)
+	return queryRecords(queryString)
+}
+
+func queryRecords(queryString string) (records []*record, err error) {
 	query := bq.Query(queryString)
 	ctx := context.Background()
 	results, err := query.Read(ctx)
@@ -178,7 +189,7 @@ func queryRecords(queryString string) (records []*Record, err error) {
 	}
 
 	for {
-		var r Record
+		var r record
 		err = results.Next(&r)
 		if err == iterator.Done {
 			err = nil
@@ -192,12 +203,7 @@ func queryRecords(queryString string) (records []*Record, err error) {
 	return
 }
 
-func recordsBy(column, value string) (records []*Record, err error) {
-	queryString := fmt.Sprintf(`SELECT DISTINCT * FROM %s WHERE %s = "%s"`, bigQueryTable, column, value)
-	return queryRecords(queryString)
-}
-
-func resultWriter(w http.ResponseWriter, records *[]*Record) {
+func resultWriter(w http.ResponseWriter, records *[]*record) {
 	resultJson, err := json.Marshal(records)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
