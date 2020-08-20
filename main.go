@@ -90,7 +90,7 @@ func handleUsername(w http.ResponseWriter, r *http.Request) {
 	username := chi.URLParam(r, "username")
 	records, err := recordsByUsername(username)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		JSONError(w, err, http.StatusInternalServerError)
 		return
 	}
 	resultWriter(w, &records)
@@ -100,7 +100,7 @@ func handlePassword(w http.ResponseWriter, r *http.Request) {
 	password := chi.URLParam(r, "password")
 	records, err := recordsByPassword(password)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		JSONError(w, err, http.StatusInternalServerError)
 		return
 	}
 	resultWriter(w, &records)
@@ -110,7 +110,7 @@ func handleDomain(w http.ResponseWriter, r *http.Request) {
 	domain := chi.URLParam(r, "domain")
 	records, err := recordsByDomain(domain)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		JSONError(w, err, http.StatusInternalServerError)
 		return
 	}
 	resultWriter(w, &records)
@@ -120,7 +120,7 @@ func handleEmail(w http.ResponseWriter, r *http.Request) {
 	email := chi.URLParam(r, "email")
 	records, err := recordsByEmail(email)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		JSONError(w, err, http.StatusBadRequest)
 		return
 	}
 	resultWriter(w, &records)
@@ -210,8 +210,21 @@ func queryRecords(queryString string) (records []*record, err error) {
 func resultWriter(w http.ResponseWriter, records *[]*record) {
 	resultJson, err := json.Marshal(records)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		JSONError(w, err, http.StatusInternalServerError)
 		return
 	}
 	w.Write(resultJson)
+}
+
+type JSONErr struct {
+	Status int `json:"status"`
+	Error string `json:"error"`
+}
+
+func JSONError(w http.ResponseWriter, err error, code int) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.WriteHeader(code)
+	error := &JSONErr{code, err.Error()}
+	json.NewEncoder(w).Encode(error)
 }
