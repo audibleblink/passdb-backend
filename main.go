@@ -173,19 +173,31 @@ func recordsByEmail(email string) (records []*record, err error) {
 		err = fmt.Errorf("invalid email format")
 		return
 	}
-
 	username, domain := usernameAndDomain[0], usernameAndDomain[1]
-	queryString := fmt.Sprintf(`SELECT DISTINCT * FROM %s WHERE username = "%s" AND domain = "%s"`, bigQueryTable, username, domain)
-	return queryRecords(queryString)
+
+	queryString := fmt.Sprintf(
+		`SELECT DISTINCT * FROM %s WHERE username = @username AND domain = @domain`,
+		bigQueryTable,
+	)
+	query := bq.Query(queryString)
+
+	query.QueryConfig.Parameters = []bigquery.QueryParameter{
+		bigquery.QueryParameter{"username", username},
+		bigquery.QueryParameter{"domain", domain},
+	}
+	return queryRecords(query)
 }
 
 func recordsBy(column, value string) (records []*record, err error) {
-	queryString := fmt.Sprintf(`SELECT DISTINCT * FROM %s WHERE %s = "%s"`, bigQueryTable, column, value)
-	return queryRecords(queryString)
+	queryString := fmt.Sprintf(`SELECT DISTINCT * FROM %s WHERE %s = @%s`, bigQueryTable, column, column)
+	query := bq.Query(queryString)
+	query.QueryConfig.Parameters = []bigquery.QueryParameter{
+		bigquery.QueryParameter{ Name: column, Value: value},
+	}
+	return queryRecords(query)
 }
 
-func queryRecords(queryString string) (records []*record, err error) {
-	query := bq.Query(queryString)
+func queryRecords(query *bigquery.Query) (records []*record, err error) {
 	ctx := context.Background()
 	results, err := query.Read(ctx)
 	if err != nil {
