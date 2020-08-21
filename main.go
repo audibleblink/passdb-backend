@@ -93,7 +93,7 @@ func handleUsername(w http.ResponseWriter, r *http.Request) {
 		JSONError(w, err, http.StatusInternalServerError)
 		return
 	}
-	resultWriter(w, &records)
+	resultWriter(w, records)
 }
 
 func handlePassword(w http.ResponseWriter, r *http.Request) {
@@ -103,7 +103,7 @@ func handlePassword(w http.ResponseWriter, r *http.Request) {
 		JSONError(w, err, http.StatusInternalServerError)
 		return
 	}
-	resultWriter(w, &records)
+	resultWriter(w, records)
 }
 
 func handleDomain(w http.ResponseWriter, r *http.Request) {
@@ -113,7 +113,7 @@ func handleDomain(w http.ResponseWriter, r *http.Request) {
 		JSONError(w, err, http.StatusInternalServerError)
 		return
 	}
-	resultWriter(w, &records)
+	resultWriter(w, records)
 }
 
 func handleEmail(w http.ResponseWriter, r *http.Request) {
@@ -123,7 +123,7 @@ func handleEmail(w http.ResponseWriter, r *http.Request) {
 		JSONError(w, err, http.StatusBadRequest)
 		return
 	}
-	resultWriter(w, &records)
+	resultWriter(w, records)
 }
 
 func handleBreaches(w http.ResponseWriter, r *http.Request) {
@@ -173,28 +173,36 @@ func recordsByEmail(email string) (records []*record, err error) {
 		err = fmt.Errorf("invalid email format")
 		return
 	}
-	username, domain := usernameAndDomain[0], usernameAndDomain[1]
 
 	queryString := fmt.Sprintf(
 		`SELECT DISTINCT * FROM %s WHERE username = @username AND domain = @domain`,
 		bigQueryTable,
 	)
-	query := bq.Query(queryString)
 
-	query.QueryConfig.Parameters = []bigquery.QueryParameter{
-		bigquery.QueryParameter{"username", username},
-		bigquery.QueryParameter{"domain", domain},
+	params := map[string]string {
+		"username": usernameAndDomain[0],
+		"domain": usernameAndDomain[1],
 	}
+	query := parameterize(queryString, params)
 	return queryRecords(query)
 }
 
 func recordsBy(column, value string) (records []*record, err error) {
 	queryString := fmt.Sprintf(`SELECT DISTINCT * FROM %s WHERE %s = @%s`, bigQueryTable, column, column)
-	query := bq.Query(queryString)
-	query.QueryConfig.Parameters = []bigquery.QueryParameter{
-		bigquery.QueryParameter{ Name: column, Value: value},
-	}
+	params := map[string]string {column: value}
+	query := parameterize(queryString, params)
 	return queryRecords(query)
+}
+
+func parameterize(q string, fields map[string]string) *bigquery.Query {
+	var params []bigquery.QueryParameter
+	for key, value := range fields {
+		param := bigquery.QueryParameter{Name: key, Value: value}
+		params = append(params, param)
+	}
+	query := bq.Query(q)
+	query.QueryConfig.Parameters = params
+	return query
 }
 
 func queryRecords(query *bigquery.Query) (records []*record, err error) {
@@ -219,12 +227,16 @@ func queryRecords(query *bigquery.Query) (records []*record, err error) {
 	return
 }
 
-func resultWriter(w http.ResponseWriter, records *[]*record) {
+func resultWriter(w http.ResponseWriter, records []*record) {
+	if records == nil{
+		records = make([]*record, 0)
+	}
 	resultJson, err := json.Marshal(records)
 	if err != nil {
 		JSONError(w, err, http.StatusInternalServerError)
 		return
 	}
+
 	w.Write(resultJson)
 }
 
