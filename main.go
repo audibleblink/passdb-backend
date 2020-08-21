@@ -206,6 +206,7 @@ func parameterize(q string, fields map[string]string) *bigquery.Query {
 }
 
 func queryRecords(query *bigquery.Query) (records []*record, err error) {
+	records = make([]*record, 0)
 	ctx := context.Background()
 	results, err := query.Read(ctx)
 	if err != nil {
@@ -228,9 +229,6 @@ func queryRecords(query *bigquery.Query) (records []*record, err error) {
 }
 
 func resultWriter(w http.ResponseWriter, records []*record) {
-	if records == nil{
-		records = make([]*record, 0)
-	}
 	resultJson, err := json.Marshal(records)
 	if err != nil {
 		JSONError(w, err, http.StatusInternalServerError)
