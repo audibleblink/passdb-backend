@@ -24,8 +24,7 @@ var (
 	googleCred    = os.Getenv("GOOGLE_APPLICATION_CREDENTIALS")
 	hibpKey       = os.Getenv("HIBP_API_KEY")
 
-	port = "3000"
-
+	listenAddr = ":3000"
 	bq *bigquery.Client
 )
 
@@ -37,7 +36,7 @@ func init() {
 	}
 
 	if len(os.Args) > 1 {
-		port = os.Args[1]
+		listenAddr = os.Args[1]
 	}
 
 	ctx := context.Background()
@@ -63,9 +62,8 @@ func main() {
 	r.Get("/emails/{email}", handleEmail)
 	r.Get("/breaches/{email}", handleBreaches)
 
-	listen := fmt.Sprintf("127.0.0.1:%s", port)
-	log.Printf("Starting server on %s\n", listen)
-	err := http.ListenAndServe(listen, r)
+	log.Printf("Starting server on %s\n", listenAddr)
+	err := http.ListenAndServe(listenAddr, r)
 	if err != nil {
 		log.Fatal(err)
 	}
