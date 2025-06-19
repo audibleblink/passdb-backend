@@ -47,10 +47,13 @@ func init() {
 }
 
 func main() {
+	cacheConfig := LoadCacheConfig()
+	
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Logger)
+	r.Use(CacheMiddleware(cacheConfig))
 	r.Use(middleware.Recoverer)
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins: []string{"*"},
@@ -61,6 +64,10 @@ func main() {
 	r.Get("/domains/{domain}", handleDomain)
 	r.Get("/emails/{email}", handleEmail)
 	r.Get("/breaches/{email}", handleBreaches)
+	
+	r.Get("/cache/stats", handleCacheStats)
+	r.Delete("/cache", handleCacheClear)
+	r.Delete("/cache/{pattern}", handleCacheClearPattern)
 
 	log.Printf("Starting server on %s\n", listenAddr)
 	err := http.ListenAndServe(listenAddr, r)
@@ -247,4 +254,36 @@ func JSONError(w http.ResponseWriter, err error, code int) {
 	w.WriteHeader(code)
 	error := &JSONErr{code, err.Error()}
 	json.NewEncoder(w).Encode(error)
+}
+
+func handleCacheStats(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	
+	response := map[string]interface{}{
+		"message": "Cache stats endpoint - implementation pending",
+		"enabled": getEnvBool("CACHE_ENABLED", true),
+	}
+	
+	json.NewEncoder(w).Encode(response)
+}
+
+func handleCacheClear(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	
+	response := map[string]interface{}{
+		"message": "Cache cleared - implementation pending",
+	}
+	
+	json.NewEncoder(w).Encode(response)
+}
+
+func handleCacheClearPattern(w http.ResponseWriter, r *http.Request) {
+	pattern := chi.URLParam(r, "pattern")
+	w.Header().Set("Content-Type", "application/json")
+	
+	response := map[string]interface{}{
+		"message": fmt.Sprintf("Cache cleared for pattern: %s - implementation pending", pattern),
+	}
+	
+	json.NewEncoder(w).Encode(response)
 }
