@@ -152,6 +152,7 @@ func CacheMiddleware(config CacheConfig) func(http.Handler) http.Handler {
 					w.Header().Set("X-Cache", "HIT")
 					w.WriteHeader(cached.StatusCode)
 					w.Write(cached.Body)
+					log.Printf("CACHE HIT: %s", cacheKey)
 					return
 				}
 			}
@@ -183,6 +184,9 @@ func CacheMiddleware(config CacheConfig) func(http.Handler) http.Handler {
 						return bucket.Put([]byte(cacheKey), data)
 					})
 				}
+				log.Printf("CACHE MISS: %s (cached for %v)", cacheKey, ttl)
+			} else {
+				log.Printf("CACHE MISS: %s (not cached - status %d)", cacheKey, rc.statusCode)
 			}
 
 			w.Header().Set("X-Cache", "MISS")
