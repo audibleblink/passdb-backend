@@ -25,7 +25,7 @@ var (
 	hibpKey       = os.Getenv("HIBP_API_KEY")
 
 	listenAddr = ":3000"
-	bq *bigquery.Client
+	bq         *bigquery.Client
 )
 
 func init() {
@@ -48,7 +48,7 @@ func init() {
 
 func main() {
 	cacheConfig := LoadCacheConfig()
-	
+
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
@@ -64,7 +64,7 @@ func main() {
 	r.Get("/domains/{domain}", handleDomain)
 	r.Get("/emails/{email}", handleEmail)
 	r.Get("/breaches/{email}", handleBreaches)
-	
+
 	r.Get("/cache/stats", handleCacheStats)
 	r.Delete("/cache", handleCacheClear)
 	r.Delete("/cache/{pattern}", handleCacheClearPattern)
@@ -184,17 +184,22 @@ func recordsByEmail(email string) (records []*record, err error) {
 		bigQueryTable,
 	)
 
-	params := map[string]string {
+	params := map[string]string{
 		"username": usernameAndDomain[0],
-		"domain": usernameAndDomain[1],
+		"domain":   usernameAndDomain[1],
 	}
 	query := parameterize(queryString, params)
 	return queryRecords(query)
 }
 
 func recordsBy(column, value string) (records []*record, err error) {
-	queryString := fmt.Sprintf(`SELECT DISTINCT * FROM %s WHERE %s = @%s`, bigQueryTable, column, column)
-	params := map[string]string {column: value}
+	queryString := fmt.Sprintf(
+		`SELECT DISTINCT * FROM %s WHERE %s = @%s`,
+		bigQueryTable,
+		column,
+		column,
+	)
+	params := map[string]string{column: value}
 	query := parameterize(queryString, params)
 	return queryRecords(query)
 }
@@ -206,7 +211,7 @@ func parameterize(q string, fields map[string]string) *bigquery.Query {
 		params = append(params, param)
 	}
 	query := bq.Query(q)
-	query.QueryConfig.Parameters = params
+	query.Parameters = params
 	return query
 }
 
@@ -234,18 +239,18 @@ func queryRecords(query *bigquery.Query) (records []*record, err error) {
 }
 
 func resultWriter(w http.ResponseWriter, records []*record) {
-	resultJson, err := json.Marshal(records)
+	resultJSON, err := json.Marshal(records)
 	if err != nil {
 		JSONError(w, err, http.StatusInternalServerError)
 		return
 	}
 
-	w.Write(resultJson)
+	w.Write(resultJSON)
 }
 
 type JSONErr struct {
-	Status int `json:"status"`
-	Error string `json:"error"`
+	Status int    `json:"status"`
+	Error  string `json:"error"`
 }
 
 func JSONError(w http.ResponseWriter, err error, code int) {
@@ -258,32 +263,32 @@ func JSONError(w http.ResponseWriter, err error, code int) {
 
 func handleCacheStats(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	
-	response := map[string]interface{}{
+
+	response := map[string]any{
 		"message": "Cache stats endpoint - implementation pending",
 		"enabled": getEnvBool("CACHE_ENABLED", true),
 	}
-	
+
 	json.NewEncoder(w).Encode(response)
 }
 
 func handleCacheClear(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	
-	response := map[string]interface{}{
+
+	response := map[string]any{
 		"message": "Cache cleared - implementation pending",
 	}
-	
+
 	json.NewEncoder(w).Encode(response)
 }
 
 func handleCacheClearPattern(w http.ResponseWriter, r *http.Request) {
 	pattern := chi.URLParam(r, "pattern")
 	w.Header().Set("Content-Type", "application/json")
-	
-	response := map[string]interface{}{
+
+	response := map[string]any{
 		"message": fmt.Sprintf("Cache cleared for pattern: %s - implementation pending", pattern),
 	}
-	
+
 	json.NewEncoder(w).Encode(response)
 }

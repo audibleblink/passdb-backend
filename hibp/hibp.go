@@ -1,18 +1,19 @@
+// Package hibp provides a client for the haveibeenpwned.com API.
 package hibp
 
 import (
 	"encoding/json"
 	"errors"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
 )
 
-//API URL of haveibeenpwned.com
+// API URL of haveibeenpwned.com
 const API = "https://haveibeenpwned.com/api/v3/"
 
-//BreachModel Each breach contains a number of attributes describing the incident. In the future, these attributes may expand without the API being versioned.
+// BreachModel Each breach contains a number of attributes describing the incident. In the future, these attributes may expand without the API being versioned.
 type BreachModel struct {
 	Name         string   `json:"Name,omitempty"`
 	Title        string   `json:"Title,omitempty"`
@@ -31,9 +32,11 @@ type BreachModel struct {
 	LogoPath     string   `json:"LogoPath,omitempty"`
 }
 
-//BreachedAccount The most common use of the API is to return a list of all breaches a particular account has been involved in. The API takes a single parameter which is the account to be searched for. The account is not case sensitive and will be trimmed of leading or trailing white spaces. The account should always be URL encoded.
-func BreachedAccount(account, domainFilter string, truncate, unverified bool) ([]BreachModel, error) {
-
+// BreachedAccount The most common use of the API is to return a list of all breaches a particular account has been involved in. The API takes a single parameter which is the account to be searched for. The account is not case sensitive and will be trimmed of leading or trailing white spaces. The account should always be URL encoded.
+func BreachedAccount(
+	account, domainFilter string,
+	truncate, unverified bool,
+) ([]BreachModel, error) {
 	res, err := callService("breachedaccount", account, domainFilter, truncate, unverified)
 	if err != nil {
 		return nil, err
@@ -42,7 +45,7 @@ func BreachedAccount(account, domainFilter string, truncate, unverified bool) ([
 		return nil, nil
 	}
 
-	body, err := ioutil.ReadAll(res.Body)
+	body, err := io.ReadAll(res.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -56,7 +59,10 @@ func BreachedAccount(account, domainFilter string, truncate, unverified bool) ([
 	return breaches, nil
 }
 
-func callService(service, account, domainFilter string, truncate, unverified bool) (*http.Response, error) {
+func callService(
+	service, account, domainFilter string,
+	truncate, unverified bool,
+) (*http.Response, error) {
 	client := &http.Client{}
 
 	u, err := url.Parse(API)
@@ -69,7 +75,7 @@ func callService(service, account, domainFilter string, truncate, unverified boo
 	if domainFilter != "" {
 		parameters.Add("domain", domainFilter)
 	}
-	if truncate == false {
+	if !truncate {
 		parameters.Add("truncateResponse", "false")
 	}
 	if unverified {
