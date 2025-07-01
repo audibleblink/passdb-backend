@@ -15,7 +15,7 @@ WORKDIR /app
 # RUN apk add --no-cache git make
 COPY . .
 # COPY --from=frontend-builder /app/docs /app
-RUN go build -o build/passdb .
+RUN go build -o build/passdb
 
 #================
 # Stage 3: Final runtime image
