@@ -8,6 +8,7 @@ require (
 	cloud.google.com/go/bigquery v1.10.0
 	github.com/go-chi/chi v4.1.2+incompatible
 	github.com/go-chi/cors v1.1.1
+	go.etcd.io/bbolt v1.4.1
 	google.golang.org/api v0.29.0
 )
 
@@ -17,7 +18,6 @@ require (
 	github.com/golang/protobuf v1.4.2 // indirect
 	github.com/googleapis/gax-go/v2 v2.0.5 // indirect
 	github.com/jstemmer/go-junit-report v0.9.1 // indirect
-	go.etcd.io/bbolt v1.4.1 // indirect
 	go.opencensus.io v0.22.3 // indirect
 	golang.org/x/lint v0.0.0-20200302205851-738671d3881b // indirect
 	golang.org/x/mod v0.3.0 // indirect

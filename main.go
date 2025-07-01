@@ -2,12 +2,17 @@ package main
 
 import (
 	"context"
+	"embed"
 	"encoding/json"
 	"fmt"
+	"io"
+	"io/fs"
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
+	"time"
 
 	"cloud.google.com/go/bigquery"
 	"google.golang.org/api/iterator"
@@ -17,6 +22,9 @@ import (
 	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/cors"
 )
+
+//go:embed docs
+var staticFiles embed.FS
 
 var (
 	projectID     = os.Getenv("GOOGLE_CLOUD_PROJECT")
@@ -50,26 +58,39 @@ func main() {
 	cacheConfig := LoadCacheConfig()
 
 	r := chi.NewRouter()
+	r.Use(cors.Handler(cors.Options{
+		AllowedOrigins: []string{"*"},
+	}))
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Logger)
 	r.Use(CacheMiddleware(cacheConfig))
 	r.Use(middleware.Recoverer)
-	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins: []string{"*"},
-	}))
 
-	r.Get("/usernames/{username}", handleUsername)
-	r.Get("/passwords/{password}", handlePassword)
-	r.Get("/domains/{domain}", handleDomain)
-	r.Get("/emails/{email}", handleEmail)
-	r.Get("/breaches/{email}", handleBreaches)
+	// API routes with versioning
+	r.Route("/api/v1", func(r chi.Router) {
+		// Health check endpoint
+		r.Get("/health", handleHealth)
 
-	r.Get("/cache/stats", handleCacheStats)
-	r.Delete("/cache", handleCacheClear)
-	r.Delete("/cache/{pattern}", handleCacheClearPattern)
+		// Password database endpoints
+		r.Get("/usernames/{username}", handleUsername)
+		r.Get("/passwords/{password}", handlePassword)
+		r.Get("/domains/{domain}", handleDomain)
+		r.Get("/emails/{email}", handleEmail)
+		r.Get("/breaches/{email}", handleBreaches)
+
+		// Cache management endpoints
+		r.Get("/cache/stats", handleCacheStats)
+		r.Delete("/cache", handleCacheClear)
+		r.Delete("/cache/{pattern}", handleCacheClearPattern)
+	})
+
+	// Static file serving
+	setupStaticRoutes(r)
 
 	log.Printf("Starting server on %s\n", listenAddr)
+	log.Printf("API endpoints available at /api/v1/")
+	log.Printf("Static files served from /")
 	err := http.ListenAndServe(listenAddr, r)
 	if err != nil {
 		log.Fatal(err)
@@ -264,19 +285,26 @@ func JSONError(w http.ResponseWriter, err error, code int) {
 func handleCacheStats(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	response := map[string]any{
-		"message": "Cache stats endpoint - implementation pending",
-		"enabled": getEnvBool("CACHE_ENABLED", true),
+	stats, err := GetCacheStats()
+	if err != nil {
+		JSONError(w, err, http.StatusInternalServerError)
+		return
 	}
 
-	json.NewEncoder(w).Encode(response)
+	json.NewEncoder(w).Encode(stats)
 }
 
 func handleCacheClear(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
+	if err := ClearCache(); err != nil {
+		JSONError(w, err, http.StatusInternalServerError)
+		return
+	}
+
 	response := map[string]any{
-		"message": "Cache cleared - implementation pending",
+		"message": "Cache cleared successfully",
+		"success": true,
 	}
 
 	json.NewEncoder(w).Encode(response)
@@ -286,9 +314,91 @@ func handleCacheClearPattern(w http.ResponseWriter, r *http.Request) {
 	pattern := chi.URLParam(r, "pattern")
 	w.Header().Set("Content-Type", "application/json")
 
+	deletedCount, err := ClearCachePattern(pattern)
+	if err != nil {
+		JSONError(w, err, http.StatusInternalServerError)
+		return
+	}
+
 	response := map[string]any{
-		"message": fmt.Sprintf("Cache cleared for pattern: %s - implementation pending", pattern),
+		"message": fmt.Sprintf("Cache entries matching pattern '%s' cleared", pattern),
+		"deleted_count": deletedCount,
+		"success": true,
 	}
 
 	json.NewEncoder(w).Encode(response)
+}
+
+func handleHealth(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	response := map[string]any{
+		"status":  "healthy",
+		"service": "passdb-api",
+		"version": "v1",
+	}
+
+	json.NewEncoder(w).Encode(response)
+}
+
+func setupStaticRoutes(r chi.Router) {
+	// Create a sub filesystem for the docs directory
+	docsFS, err := fs.Sub(staticFiles, "docs")
+	if err != nil {
+		log.Printf("Warning: could not create docs filesystem: %v", err)
+		return
+	}
+
+	// Serve static files from the docs directory
+	fileServer := http.FileServer(http.FS(docsFS))
+
+	// Handle all remaining routes as static files
+	r.Get("/*", func(w http.ResponseWriter, r *http.Request) {
+		rctx := chi.RouteContext(r.Context())
+		pathPrefix := strings.TrimSuffix(rctx.RoutePattern(), "/*")
+		fs := http.StripPrefix(pathPrefix, fileServer)
+
+		// Set appropriate content type based on file extension
+		ext := filepath.Ext(r.URL.Path)
+		switch ext {
+		case ".html":
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		case ".css":
+			w.Header().Set("Content-Type", "text/css; charset=utf-8")
+		case ".js":
+			w.Header().Set("Content-Type", "application/javascript; charset=utf-8")
+		case ".json":
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		case ".png":
+			w.Header().Set("Content-Type", "image/png")
+		case ".jpg", ".jpeg":
+			w.Header().Set("Content-Type", "image/jpeg")
+		case ".svg":
+			w.Header().Set("Content-Type", "image/svg+xml")
+		}
+
+		// Add cache headers for static assets
+		w.Header().Set("Cache-Control", "public, max-age=31536000") // 1 year
+
+		// Try to serve the requested file
+		fs.ServeHTTP(w, r)
+	})
+
+	// Fallback route for SPA routing - serve index.html for unmatched routes
+	r.NotFound(func(w http.ResponseWriter, r *http.Request) {
+		// Only serve index.html for non-API routes
+		if !strings.HasPrefix(r.URL.Path, "/api/") {
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			indexFile, err := docsFS.Open("index.html")
+			if err != nil {
+				http.NotFound(w, r)
+				return
+			}
+			defer indexFile.Close()
+
+			http.ServeContent(w, r, "index.html", time.Time{}, indexFile.(io.ReadSeeker))
+		} else {
+			http.NotFound(w, r)
+		}
+	})
 }

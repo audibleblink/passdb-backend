@@ -1,3 +1,6 @@
 .env
 credentials.json
 cache.db
+node_modules
+docs/*
+build/
