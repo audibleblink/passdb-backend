@@ -12,20 +12,25 @@
 #================
 FROM golang:1.24-alpine AS go-builder
 WORKDIR /app
+EXPOSE 3000
 # RUN apk add --no-cache git make
-COPY . .
+COPY . /app/
 # COPY --from=frontend-builder /app/docs /app
-RUN go build -o build/passdb
+RUN go build 
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:3000/api/v1/health || exit 1
+
+ENTRYPOINT ["/app/passdb"]
 
 #================
 # Stage 3: Final runtime image
 #================
-FROM alpine:latest
-RUN apk --no-cache add ca-certificates tzdata curl
-WORKDIR /app
-COPY --from=go-builder /app/build/passdb /usr/local/bin/passdb
-EXPOSE 3000
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost:3000/api/v1/health || exit 1
-
-ENTRYPOINT ["passdb"]
+# FROM alpine:latest
+# RUN apk --no-cache add ca-certificates tzdata curl
+# WORKDIR /app
+# COPY --from=go-builder /app/build/passdb /usr/local/bin/passdb
+# EXPOSE 3000
+# HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+#   CMD curl -f http://localhost:3000/api/v1/health || exit 1
+#
+# ENTRYPOINT ["passdb"]

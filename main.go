@@ -2,17 +2,12 @@ package main
 
 import (
 	"context"
-	"embed"
 	"encoding/json"
 	"fmt"
-	"io"
-	"io/fs"
 	"log"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strings"
-	"time"
 
 	"cloud.google.com/go/bigquery"
 	"google.golang.org/api/iterator"
@@ -22,9 +17,6 @@ import (
 	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/cors"
 )
-
-//go:embed docs
-var staticFiles embed.FS
 
 var (
 	projectID     = os.Getenv("GOOGLE_CLOUD_PROJECT")
@@ -84,9 +76,6 @@ func main() {
 		r.Delete("/cache", handleCacheClear)
 		r.Delete("/cache/{pattern}", handleCacheClearPattern)
 	})
-
-	// Static file serving
-	setupStaticRoutes(r)
 
 	log.Printf("Starting server on %s\n", listenAddr)
 	log.Printf("API endpoints available at /api/v1/")
@@ -321,9 +310,9 @@ func handleCacheClearPattern(w http.ResponseWriter, r *http.Request) {
 	}
 
 	response := map[string]any{
-		"message": fmt.Sprintf("Cache entries matching pattern '%s' cleared", pattern),
+		"message":       fmt.Sprintf("Cache entries matching pattern '%s' cleared", pattern),
 		"deleted_count": deletedCount,
-		"success": true,
+		"success":       true,
 	}
 
 	json.NewEncoder(w).Encode(response)
@@ -339,66 +328,4 @@ func handleHealth(w http.ResponseWriter, r *http.Request) {
 	}
 
 	json.NewEncoder(w).Encode(response)
-}
-
-func setupStaticRoutes(r chi.Router) {
-	// Create a sub filesystem for the docs directory
-	docsFS, err := fs.Sub(staticFiles, "docs")
-	if err != nil {
-		log.Printf("Warning: could not create docs filesystem: %v", err)
-		return
-	}
-
-	// Serve static files from the docs directory
-	fileServer := http.FileServer(http.FS(docsFS))
-
-	// Handle all remaining routes as static files
-	r.Get("/*", func(w http.ResponseWriter, r *http.Request) {
-		rctx := chi.RouteContext(r.Context())
-		pathPrefix := strings.TrimSuffix(rctx.RoutePattern(), "/*")
-		fs := http.StripPrefix(pathPrefix, fileServer)
-
-		// Set appropriate content type based on file extension
-		ext := filepath.Ext(r.URL.Path)
-		switch ext {
-		case ".html":
-			w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		case ".css":
-			w.Header().Set("Content-Type", "text/css; charset=utf-8")
-		case ".js":
-			w.Header().Set("Content-Type", "application/javascript; charset=utf-8")
-		case ".json":
-			w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		case ".png":
-			w.Header().Set("Content-Type", "image/png")
-		case ".jpg", ".jpeg":
-			w.Header().Set("Content-Type", "image/jpeg")
-		case ".svg":
-			w.Header().Set("Content-Type", "image/svg+xml")
-		}
-
-		// Add cache headers for static assets
-		w.Header().Set("Cache-Control", "public, max-age=31536000") // 1 year
-
-		// Try to serve the requested file
-		fs.ServeHTTP(w, r)
-	})
-
-	// Fallback route for SPA routing - serve index.html for unmatched routes
-	r.NotFound(func(w http.ResponseWriter, r *http.Request) {
-		// Only serve index.html for non-API routes
-		if !strings.HasPrefix(r.URL.Path, "/api/") {
-			w.Header().Set("Content-Type", "text/html; charset=utf-8")
-			indexFile, err := docsFS.Open("index.html")
-			if err != nil {
-				http.NotFound(w, r)
-				return
-			}
-			defer indexFile.Close()
-
-			http.ServeContent(w, r, "index.html", time.Time{}, indexFile.(io.ReadSeeker))
-		} else {
-			http.NotFound(w, r)
-		}
-	})
 }
