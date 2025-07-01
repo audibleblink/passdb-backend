@@ -40,8 +40,8 @@ func newResponseCapture(w http.ResponseWriter) *responseCapture {
 	return &responseCapture{
 		ResponseWriter: w,
 		statusCode:     http.StatusOK,
-		body:          new(bytes.Buffer),
-		headers:       make(http.Header),
+		body:           new(bytes.Buffer),
+		headers:        make(http.Header),
 	}
 }
 
@@ -67,11 +67,26 @@ func LoadCacheConfig() CacheConfig {
 		RouteTTLs:  make(map[string]time.Duration),
 	}
 
-	config.RouteTTLs["/breaches/"] = getEnvDuration("CACHE_TTL_BREACHES", 168*time.Hour)   // 7 days
-	config.RouteTTLs["/usernames/"] = getEnvDuration("CACHE_TTL_USERNAMES", 720*time.Hour) // 30 days
-	config.RouteTTLs["/passwords/"] = getEnvDuration("CACHE_TTL_PASSWORDS", 720*time.Hour) // 30 days
-	config.RouteTTLs["/domains/"] = getEnvDuration("CACHE_TTL_DOMAINS", 720*time.Hour)     // 30 days
-	config.RouteTTLs["/emails/"] = getEnvDuration("CACHE_TTL_EMAILS", 720*time.Hour)       // 30 days
+	config.RouteTTLs["/api/v1/breaches/"] = getEnvDuration(
+		"CACHE_TTL_BREACHES",
+		168*time.Hour,
+	) // 7 days
+	config.RouteTTLs["/api/v1/usernames/"] = getEnvDuration(
+		"CACHE_TTL_USERNAMES",
+		720*time.Hour,
+	) // 30 days
+	config.RouteTTLs["/api/v1/passwords/"] = getEnvDuration(
+		"CACHE_TTL_PASSWORDS",
+		720*time.Hour,
+	) // 30 days
+	config.RouteTTLs["/api/v1/domains/"] = getEnvDuration(
+		"CACHE_TTL_DOMAINS",
+		720*time.Hour,
+	) // 30 days
+	config.RouteTTLs["/api/v1/emails/"] = getEnvDuration(
+		"CACHE_TTL_EMAILS",
+		720*time.Hour,
+	) // 30 days
 
 	return config
 }
@@ -102,6 +117,9 @@ func getEnvDuration(key string, defaultValue time.Duration) time.Duration {
 }
 
 func CacheMiddleware(config CacheConfig) func(http.Handler) http.Handler {
+	// Store config in global variable for management functions
+	cacheConfig = config
+
 	if !config.Enabled {
 		return func(next http.Handler) http.Handler {
 			return next
@@ -116,6 +134,9 @@ func CacheMiddleware(config CacheConfig) func(http.Handler) http.Handler {
 		}
 	}
 
+	// Store db reference in global variable for management functions
+	cacheDB = db
+
 	err = db.Update(func(tx *bbolt.Tx) error {
 		_, err := tx.CreateBucketIfNotExists([]byte("cache"))
 		return err
@@ -123,6 +144,7 @@ func CacheMiddleware(config CacheConfig) func(http.Handler) http.Handler {
 	if err != nil {
 		log.Printf("Failed to create cache bucket: %v", err)
 		db.Close()
+		cacheDB = nil
 		return func(next http.Handler) http.Handler {
 			return next
 		}
@@ -130,8 +152,14 @@ func CacheMiddleware(config CacheConfig) func(http.Handler) http.Handler {
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Check if this route should be cached
+			if !shouldCache(r.URL.Path, config) {
+				next.ServeHTTP(w, r)
+				return
+			}
+
 			cacheKey := fmt.Sprintf("%s:%s", r.Method, r.URL.Path)
-			
+
 			var cached *CacheEntry
 			err := db.View(func(tx *bbolt.Tx) error {
 				bucket := tx.Bucket([]byte("cache"))
@@ -139,7 +167,7 @@ func CacheMiddleware(config CacheConfig) func(http.Handler) http.Handler {
 				if data == nil {
 					return nil
 				}
-				
+
 				cached = &CacheEntry{}
 				return json.Unmarshal(data, cached)
 			})
@@ -162,7 +190,7 @@ func CacheMiddleware(config CacheConfig) func(http.Handler) http.Handler {
 
 			if rc.statusCode >= 200 && rc.statusCode < 300 {
 				ttl := getTTLForPath(r.URL.Path, config)
-				
+
 				entry := CacheEntry{
 					StatusCode: rc.statusCode,
 					Headers:    make(map[string]string),
@@ -202,3 +230,151 @@ func getTTLForPath(path string, config CacheConfig) time.Duration {
 	}
 	return config.DefaultTTL
 }
+
+func shouldCache(path string, config CacheConfig) bool {
+	// Check if the path matches any configured cache routes
+	for routePattern := range config.RouteTTLs {
+		if strings.HasPrefix(path, routePattern) {
+			return true
+		}
+	}
+	return false
+}
+
+// Global cache database reference for management functions
+var cacheDB *bbolt.DB
+var cacheConfig CacheConfig
+
+// CacheStats represents cache statistics
+type CacheStats struct {
+	Enabled       bool                     `json:"enabled"`
+	TotalEntries  int                      `json:"total_entries"`
+	DatabaseSize  int64                    `json:"database_size_bytes"`
+	Configuration map[string]interface{}   `json:"configuration"`
+	EntriesByPath map[string]int           `json:"entries_by_path"`
+}
+
+// GetCacheStats returns current cache statistics
+func GetCacheStats() (CacheStats, error) {
+	stats := CacheStats{
+		Enabled:       cacheConfig.Enabled,
+		Configuration: make(map[string]interface{}),
+		EntriesByPath: make(map[string]int),
+	}
+
+	// Add configuration details
+	stats.Configuration["default_ttl"] = cacheConfig.DefaultTTL.String()
+	stats.Configuration["db_path"] = cacheConfig.DBPath
+	
+	// Add route-specific TTLs
+	routeTTLs := make(map[string]string)
+	for route, ttl := range cacheConfig.RouteTTLs {
+		routeTTLs[route] = ttl.String()
+	}
+	stats.Configuration["route_ttls"] = routeTTLs
+
+	if !cacheConfig.Enabled || cacheDB == nil {
+		return stats, nil
+	}
+
+	// Get database file size
+	if fileInfo, err := os.Stat(cacheConfig.DBPath); err == nil {
+		stats.DatabaseSize = fileInfo.Size()
+	}
+
+	// Count entries and group by path prefix
+	err := cacheDB.View(func(tx *bbolt.Tx) error {
+		bucket := tx.Bucket([]byte("cache"))
+		if bucket == nil {
+			return nil
+		}
+
+		return bucket.ForEach(func(k, v []byte) error {
+			stats.TotalEntries++
+			
+			// Extract path from cache key (format: "METHOD:path")
+			key := string(k)
+			parts := strings.SplitN(key, ":", 2)
+			if len(parts) == 2 {
+				path := parts[1]
+				// Group by route prefix
+				for routePrefix := range cacheConfig.RouteTTLs {
+					if strings.HasPrefix(path, routePrefix) {
+						stats.EntriesByPath[routePrefix]++
+						break
+					}
+				}
+			}
+			
+			return nil
+		})
+	})
+
+	return stats, err
+}
+
+// ClearCache removes all entries from the cache
+func ClearCache() error {
+	if !cacheConfig.Enabled || cacheDB == nil {
+		return fmt.Errorf("cache is not enabled or not initialized")
+	}
+
+	return cacheDB.Update(func(tx *bbolt.Tx) error {
+		bucket := tx.Bucket([]byte("cache"))
+		if bucket == nil {
+			return nil
+		}
+
+		// Delete and recreate the bucket to clear all entries
+		if err := tx.DeleteBucket([]byte("cache")); err != nil {
+			return err
+		}
+		_, err := tx.CreateBucket([]byte("cache"))
+		return err
+	})
+}
+
+// ClearCachePattern removes cache entries matching the given pattern
+func ClearCachePattern(pattern string) (int, error) {
+	if !cacheConfig.Enabled || cacheDB == nil {
+		return 0, fmt.Errorf("cache is not enabled or not initialized")
+	}
+
+	var deletedCount int
+	
+	err := cacheDB.Update(func(tx *bbolt.Tx) error {
+		bucket := tx.Bucket([]byte("cache"))
+		if bucket == nil {
+			return nil
+		}
+
+		// Collect keys to delete
+		var keysToDelete [][]byte
+		
+		err := bucket.ForEach(func(k, v []byte) error {
+			key := string(k)
+			// Check if key contains the pattern
+			if strings.Contains(key, pattern) {
+				keysToDelete = append(keysToDelete, k)
+			}
+			return nil
+		})
+		
+		if err != nil {
+			return err
+		}
+
+		// Delete the collected keys
+		for _, key := range keysToDelete {
+			if err := bucket.Delete(key); err != nil {
+				return err
+			}
+			deletedCount++
+		}
+
+		return nil
+	})
+
+	return deletedCount, err
+}
+
